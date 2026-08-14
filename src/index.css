@@ -17,18 +17,14 @@ html {
 
 body {
   margin: 0;
-
   font-family:
     'Inter',
     'Segoe UI',
     Roboto,
     Arial,
     sans-serif;
-
   background: #f1f5fb;
-
   color: #1e293b;
-
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
