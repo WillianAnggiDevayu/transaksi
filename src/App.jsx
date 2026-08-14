@@ -4,30 +4,23 @@ import {
   Users,
   Package,
   ShoppingCart,
+  Plus,
+  Trash2,
   LogOut,
 } from "lucide-react";
 
+import Login from "./login";
 import "./App.css";
-import Login from "./Login";
 
 function App() {
-  /* =========================================
-     LOGIN
-  ========================================= */
-
+  // LOGIN
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  /* =========================================
-     MENU
-  ========================================= */
-
+  // MENU
   const [menu, setMenu] = useState("dashboard");
 
-  /* =========================================
-     DATA SUPPLIER
-  ========================================= */
-
-  const [supplier, setSupplier] = useState([
+  // DATA SUPPLIER
+  const [supplier] = useState([
     {
       id: 1,
       nama: "PT ABC Indonesia",
@@ -40,11 +33,9 @@ function App() {
     },
   ]);
 
-  /* =========================================
-     DATA BARANG
-  ========================================= */
+  // DATA BARANG
 
-  const [barang, setBarang] = useState([
+  const [barang] = useState([
     {
       id: 1,
       nama: "Laptop",
@@ -65,11 +56,9 @@ function App() {
     },
   ]);
 
-  /* =========================================
-     DATA PEMBELIAN
-  ========================================= */
-
-  const [pembelian, setPembelian] = useState([
+  // DATA PEMBELIAN
+ 
+  const [pembelian] = useState([
     {
       id: 1,
       tanggal: "13-08-2026",
@@ -84,143 +73,141 @@ function App() {
     },
   ]);
 
-  /* =========================================
-     FORM PEMBELIAN
-  ========================================= */
+  // FORM PEMBELIAN
 
-  const [selectedSupplier, setSelectedSupplier] = useState("");
-  const [selectedBarang, setSelectedBarang] = useState("");
-  const [jumlah, setJumlah] = useState("");
-  const [harga, setHarga] = useState("");
+  const [supplierDipilih, setSupplierDipilih] =
+    useState("");
 
-  /* =========================================
-     FORMAT RUPIAH
-  ========================================= */
+  const [tanggalPembelian, setTanggalPembelian] =
+    useState("");
+
+
+  // DETAIL BARANG
+
+  const [items, setItems] = useState([
+    {
+      id: Date.now(),
+      barangId: "",
+      harga: "",
+      jumlah: 0,
+    },
+  ]);
+
+  // FORMAT RUPIAH
 
   const formatRupiah = (angka) => {
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
       currency: "IDR",
       maximumFractionDigits: 0,
-    }).format(angka);
+    }).format(angka || 0);
   };
 
-  /* =========================================
-     SUBTOTAL
-  ========================================= */
+  // PILIH BARANG
 
-  const subtotal =
-    Number(jumlah || 0) * Number(harga || 0);
-
-  /* =========================================
-     PILIH BARANG
-     OTOMATIS MENGISI HARGA
-  ========================================= */
-
-  const handleBarangChange = (e) => {
-    const barangId = e.target.value;
-
-    setSelectedBarang(barangId);
-
-    const dataBarang = barang.find(
+  const handleBarangChange = (index, barangId) => {
+    const barangDipilih = barang.find(
       (item) => item.id === Number(barangId)
     );
 
-    if (dataBarang) {
-      setHarga(dataBarang.harga);
+    const newItems = [...items];
+    newItems[index].barangId = barangId;
+    if (barangDipilih) {
+      newItems[index].harga = barangDipilih.harga;
     } else {
-      setHarga("");
+      newItems[index].harga = "";
     }
+    setItems(newItems);
   };
 
-  /* =========================================
-     SIMPAN PEMBELIAN
-  ========================================= */
+  // UBAH DATA ITEM
+
+  const handleItemChange = (index, field, value) => {
+    const newItems = [...items];
+    newItems[index][field] = value;
+    setItems(newItems);
+  };
+
+  // TAMBAH BARANG
+
+  const tambahBarang = () => {
+    setItems([
+      ...items,
+      {
+        id: Date.now(),
+        barangId: "",
+        harga: "",
+        jumlah: 0,
+      },
+    ]);
+  };
+
+  // HAPUS BARANG
+
+  const hapusBarang = (index) => {
+    if (items.length === 1) {
+      return;
+    }
+    const newItems = items.filter(
+      (_, i) => i !== index
+    );
+    setItems(newItems);
+  };
+
+  // HITUNG SUBTOTAL
+
+  const hitungSubtotal = (item) => {
+    return (
+      Number(item.harga || 0) *
+      Number(item.jumlah || 0)
+    );
+  };
+
+  // HITUNG TOTAL PEMBELIAN
+
+  const totalPembelian = items.reduce(
+    (total, item) => {
+      return total + hitungSubtotal(item);
+    },
+    0
+  );
+
+  // SIMPAN PEMBELIAN
 
   const handleSimpanPembelian = () => {
-    if (
-      !selectedSupplier ||
-      !selectedBarang ||
-      !jumlah ||
-      !harga
-    ) {
-      alert("Silakan lengkapi data pembelian terlebih dahulu.");
+    if (!supplierDipilih) {
+      alert(
+        "Silakan pilih supplier terlebih dahulu."
+      );
       return;
     }
 
-    const supplierData = supplier.find(
-      (item) => item.id === Number(selectedSupplier)
-    );
-
-    const barangData = barang.find(
-      (item) => item.id === Number(selectedBarang)
-    );
-
-    if (!supplierData || !barangData) {
-      alert("Data supplier atau barang tidak ditemukan.");
+    if (!tanggalPembelian) {
+      alert(
+        "Silakan pilih tanggal pembelian terlebih dahulu."
+      );
       return;
     }
 
-    const tanggalSekarang =
-      new Date().toLocaleDateString("id-ID");
-
-    const pembelianBaru = {
-      id: pembelian.length + 1,
-      tanggal: tanggalSekarang,
-      supplier: supplierData.nama,
-      total: subtotal,
-    };
-
-    setPembelian([
-      pembelianBaru,
-      ...pembelian,
-    ]);
-
-    /* Update stok barang */
-
-    setBarang(
-      barang.map((item) => {
-        if (item.id === Number(selectedBarang)) {
-          return {
-            ...item,
-            stok: item.stok - Number(jumlah),
-          };
-        }
-
-        return item;
-      })
+    const adaBarangKosong = items.some(
+      (item) => !item.barangId
     );
 
-    /* Reset form */
-
-    setSelectedSupplier("");
-    setSelectedBarang("");
-    setJumlah("");
-    setHarga("");
-
-    alert("Pembelian berhasil disimpan!");
-
-    setMenu("dashboard");
-  };
-
-  /* =========================================
-     LOGOUT
-  ========================================= */
-
-  const handleLogout = () => {
-    const yakin = window.confirm(
-      "Apakah Anda yakin ingin keluar?"
-    );
-
-    if (yakin) {
-      setIsLoggedIn(false);
-      setMenu("dashboard");
+    if (adaBarangKosong) {
+      alert(
+        "Silakan pilih barang terlebih dahulu."
+      );
+      return;
     }
+
+    alert(
+      `Pembelian berhasil disimpan!\nTotal: ${formatRupiah(
+        totalPembelian
+      )}`
+    );
   };
 
-  /* =========================================
-     LOGIN PAGE
-  ========================================= */
+  // LOGIN
 
   if (!isLoggedIn) {
     return (
@@ -230,43 +217,31 @@ function App() {
     );
   }
 
-  /* =========================================
-     DASHBOARD
-  ========================================= */
+  // DASHBOARD
 
   return (
     <div className="app">
 
-      {/* =====================================
-          SIDEBAR
-      ===================================== */}
+      {/* SIDEBAR */}
 
       <aside className="sidebar">
-
         {/* LOGO */}
-
         <div className="logo">
-
           <div className="logo-icon">
-            P
-          </div>
-
+            P </div>
           <div>
-            <h2>Purchase</h2>
+            <h2>
+              Purchase </h2>
             <span>
-              Management System
-            </span>
+              Management System </span>
           </div>
-
         </div>
-
 
         {/* MENU TITLE */}
 
         <div className="menu-title">
           MENU UTAMA
         </div>
-
 
         {/* DASHBOARD */}
 
@@ -284,13 +259,10 @@ function App() {
           <span className="menu-icon">
             <LayoutDashboard size={19} />
           </span>
-
           <span>
             Dashboard
           </span>
-
         </button>
-
 
         {/* SUPPLIER */}
 
@@ -315,7 +287,6 @@ function App() {
 
         </button>
 
-
         {/* BARANG */}
 
         <button
@@ -338,7 +309,6 @@ function App() {
           </span>
 
         </button>
-
 
         {/* PEMBELIAN */}
 
@@ -363,17 +333,12 @@ function App() {
 
         </button>
 
-
-        {/* LOGOUT */}
+                {/* LOGOUT */}
 
         <button
-          className="menu"
-          onClick={handleLogout}
-          style={{
-            marginTop: "25px",
-          }}
+          className="menu logout-menu"
+          onClick={() => setIsLoggedIn(false)}
         >
-
           <span className="menu-icon">
             <LogOut size={19} />
           </span>
@@ -381,64 +346,40 @@ function App() {
           <span>
             Logout
           </span>
-
         </button>
 
       </aside>
 
-
-      {/* =====================================
-          MAIN
-      ===================================== */}
-
+      {/* MAIN */}
       <main className="main">
 
-
-        {/* ===================================
-            HEADER
-        =================================== */}
+        {/* HEADER */}
 
         <header className="header">
-
           <div>
-
             <h1>
-
               {menu === "dashboard" &&
                 "Dashboard"}
-
               {menu === "supplier" &&
                 "Data Supplier"}
-
               {menu === "barang" &&
                 "Data Barang"}
-
               {menu === "pembelian" &&
                 "Transaksi Pembelian"}
-
             </h1>
-
             <p>
               Sistem informasi pembelian
             </p>
-
           </div>
 
-
-          {/* USER */}
-
           <div className="user">
-
             <div className="avatar">
               WA
             </div>
-
             <div>
-
               <strong>
                 Willian Anggi
               </strong>
-
               <span>
                 Administrator
               </span>
@@ -449,143 +390,84 @@ function App() {
 
         </header>
 
-
-        {/* ===================================
-            CONTENT
-        =================================== */}
+        {/* CONTENT */}
 
         <section className="content">
 
-
-          {/* =================================
-              DASHBOARD
-          ================================= */}
+          {/* DASHBOARD */}
 
           {menu === "dashboard" && (
             <>
-
-              {/* WELCOME */}
-
               <div className="welcome">
-
                 <h2>
                   Selamat Datang 👋
                 </h2>
-
                 <p>
-                  Kelola data supplier,
-                  barang, dan pembelian
+                  Kelola data pembelian
                   melalui sistem ini.
                 </p>
-
               </div>
 
-
-              {/* STATISTIC */}
-
+              {/* CARDS */}
               <div className="cards">
 
-
-                {/* SUPPLIER */}
-
+                {/* TOTAL SUPPLIER */}
                 <div className="card">
 
                   <span>
-                    👥
-                  </span>
+                    👥 </span>
 
                   <div>
-
                     <p>
-                      Total Supplier
-                    </p>
+                      Total Supplier </p>
 
                     <h2>
-                      {supplier.length}
-                    </h2>
-
+                      {supplier.length} </h2>
                   </div>
-
                 </div>
 
-
-                {/* BARANG */}
-
+                {/* TOTAL BARANG */}
                 <div className="card">
 
                   <span>
-                    📦
-                  </span>
+                    📦 </span>
 
                   <div>
-
                     <p>
-                      Total Barang
-                    </p>
-
+                      Total Barang</p>
                     <h2>
                       {barang.length}
                     </h2>
-
                   </div>
-
                 </div>
 
-
-                {/* PEMBELIAN */}
+                {/* TOTAL PEMBELIAN */}
 
                 <div className="card">
 
                   <span>
-                    🛒
-                  </span>
-
+                    🛒</span>
                   <div>
-
                     <p>
                       Total Pembelian
                     </p>
-
                     <h2>
                       {pembelian.length}
                     </h2>
-
                   </div>
-
                 </div>
-
               </div>
 
-
-              {/* TABLE PEMBELIAN */}
-
+              {/* TRANSAKSI TERBARU */}
               <div className="panel">
-
                 <div className="panel-header">
-
                   <h3>
-                    Transaksi Pembelian
-                    Terbaru
+                    Transaksi Pembelian Terbaru
                   </h3>
-
-                  <button
-                    className="btn-primary"
-                    onClick={() =>
-                      setMenu("pembelian")
-                    }
-                  >
-                    + Pembelian Baru
-                  </button>
-
                 </div>
-
-
                 <table>
-
                   <thead>
-
                     <tr>
-
                       <th>
                         No
                       </th>
@@ -605,7 +487,6 @@ function App() {
                     </tr>
 
                   </thead>
-
 
                   <tbody>
 
@@ -646,33 +527,28 @@ function App() {
             </>
           )}
 
-
-          {/* =================================
-              SUPPLIER
-          ================================= */}
+          {/* SUPPLIER */}
 
           {menu === "supplier" && (
-
             <div className="panel">
-
               <div className="panel-header">
 
                 <h3>
                   Daftar Supplier
                 </h3>
 
-                <button className="btn-primary">
+                <button
+                  className="btn-primary"
+                >
                   + Tambah Supplier
                 </button>
 
               </div>
 
-
               <input
                 className="search"
                 placeholder="Cari supplier..."
               />
-
 
               <table>
 
@@ -699,7 +575,6 @@ function App() {
                   </tr>
 
                 </thead>
-
 
                 <tbody>
 
@@ -749,10 +624,7 @@ function App() {
 
           )}
 
-
-          {/* =================================
-              BARANG
-          ================================= */}
+          {/* BARANG */}
 
           {menu === "barang" && (
 
@@ -764,18 +636,18 @@ function App() {
                   Daftar Barang
                 </h3>
 
-                <button className="btn-primary">
+                <button
+                  className="btn-primary"
+                >
                   + Tambah Barang
                 </button>
 
               </div>
 
-
               <input
                 className="search"
                 placeholder="Cari barang..."
               />
-
 
               <table>
 
@@ -806,7 +678,6 @@ function App() {
                   </tr>
 
                 </thead>
-
 
                 <tbody>
 
@@ -862,26 +733,34 @@ function App() {
 
           )}
 
-
-          {/* =================================
-              PEMBELIAN
-          ================================= */}
+          {/* PEMBELIAN */}
 
           {menu === "pembelian" && (
 
             <div className="panel">
 
+              {/* HEADER */}
+
               <div className="panel-header">
 
-                <h3>
-                  Transaksi Pembelian
-                </h3>
+                <div>
+
+                  <h3>
+                    Transaksi Pembelian
+                  </h3>
+
+                  <div className="panel-subtitle">
+                    Tambahkan barang yang ingin
+                    dibeli dari supplier.
+                  </div>
+
+                </div>
 
               </div>
 
+              {/* SUPPLIER & TANGGAL */}
 
-              <div className="form-grid">
-
+              <div className="purchase-info">
 
                 {/* SUPPLIER */}
 
@@ -892,9 +771,9 @@ function App() {
                   </label>
 
                   <select
-                    value={selectedSupplier}
+                    value={supplierDipilih}
                     onChange={(e) =>
-                      setSelectedSupplier(
+                      setSupplierDipilih(
                         e.target.value
                       )
                     }
@@ -921,127 +800,276 @@ function App() {
 
                 </div>
 
-
-                {/* BARANG */}
+                {/* TANGGAL */}
 
                 <div className="form-group">
 
                   <label>
-                    Barang
+                    Tanggal Pembelian
                   </label>
 
-                  <select
-                    value={selectedBarang}
-                    onChange={
-                      handleBarangChange
+                  <input
+                    type="date"
+                    value={tanggalPembelian}
+                    onChange={(e) =>
+                      setTanggalPembelian(
+                        e.target.value
+                      )
                     }
+                  />
+
+                </div>
+
+              </div>
+
+              {/* DETAIL BARANG */}
+
+              <div className="purchase-detail">
+
+                <div className="detail-header">
+
+                  <div>
+
+                    <h4>
+                      Detail Barang
+                    </h4>
+
+                    <span>
+                      Tambahkan satu atau
+                      beberapa barang.
+                    </span>
+
+                  </div>
+
+                  <button
+                    className="btn-add-item"
+                    onClick={tambahBarang}
                   >
 
-                    <option value="">
-                      Pilih Barang
-                    </option>
+                    <Plus size={15} />
 
-                    {barang.map(
-                      (item) => (
+                    Tambah Barang
 
-                        <option
-                          key={item.id}
-                          value={item.id}
-                        >
-                          {item.nama}
-                        </option>
-
-                      )
-                    )}
-
-                  </select>
+                  </button>
 
                 </div>
 
+                {/* TABEL DETAIL */}
 
-                {/* JUMLAH */}
+                <div className="purchase-table">
 
-                <div className="form-group">
+                  {/* HEADER TABEL */}
 
-                  <label>
-                    Jumlah Beli
-                  </label>
+                  <div className="purchase-row purchase-head">
 
-                  <input
-                    type="number"
-                    min="1"
-                    placeholder="Masukkan jumlah"
-                    value={jumlah}
-                    onChange={(e) =>
-                      setJumlah(
-                        e.target.value
-                      )
-                    }
-                  />
+                    <div>
+                      No
+                    </div>
 
-                </div>
+                    <div>
+                      Barang
+                    </div>
 
+                    <div>
+                      Harga
+                    </div>
 
-                {/* HARGA */}
+                    <div>
+                      Jumlah
+                    </div>
 
-                <div className="form-group">
+                    <div>
+                      Subtotal
+                    </div>
 
-                  <label>
-                    Harga
-                  </label>
+                    <div>
+                      Aksi
+                    </div>
 
-                  <input
-                    type="number"
-                    placeholder="Masukkan harga"
-                    value={harga}
-                    onChange={(e) =>
-                      setHarga(
-                        e.target.value
-                      )
-                    }
-                  />
+                  </div>
 
-                </div>
+                  {/* DATA BARANG */}
 
-              </div>
+                  {items.map(
+                    (item, index) => (
 
+                      <div
+                        className="purchase-row"
+                        key={item.id}
+                      >
 
-              {/* SUBTOTAL */}
+                        {/* NO */}
 
-              <div className="subtotal">
+                        <div className="row-number">
+                          {index + 1}
+                        </div>
 
-                <span>
-                  Subtotal
-                </span>
+                        {/* BARANG */}
 
-                <strong>
-                  {formatRupiah(
-                    subtotal
+                        <div>
+
+                          <select
+                            className="purchase-input"
+                            value={
+                              item.barangId
+                            }
+                            onChange={(e) =>
+                              handleBarangChange(
+                                index,
+                                e.target.value
+                              )
+                            }
+                          >
+
+                            <option value="">
+                              Pilih Barang
+                            </option>
+
+                            {barang.map(
+                              (barangItem) => (
+
+                                <option
+                                  key={
+                                    barangItem.id
+                                  }
+                                  value={
+                                    barangItem.id
+                                  }
+                                >
+                                  {
+                                    barangItem.nama
+                                  }
+                                </option>
+
+                              )
+                            )}
+
+                          </select>
+
+                        </div>
+
+                        {/* HARGA */}
+
+                        <div>
+
+                          <input
+                            type="number"
+                            className="purchase-input"
+                            placeholder="Harga"
+                            value={
+                              item.harga
+                            }
+                            onChange={(e) =>
+                              handleItemChange(
+                                index,
+                                "harga",
+                                e.target.value
+                              )
+                            }
+                          />
+
+                        </div>
+
+                        {/* JUMLAH */}
+
+                        <div>
+
+                          <input
+                            type="number"
+                            min="0"
+                            className="purchase-input quantity-input"
+                            value={
+                              item.jumlah
+                            }
+                            onChange={(e) =>
+                              handleItemChange(
+                                index,
+                                "jumlah",
+                                e.target.value
+                              )
+                            }
+                          />
+
+                        </div>
+
+                        {/* SUBTOTAL */}
+
+                        <div className="item-subtotal">
+
+                          {formatRupiah(
+                            hitungSubtotal(item)
+                          )}
+
+                        </div>
+
+                        {/* HAPUS */}
+
+                        <div>
+
+                          <button
+                            className="btn-delete-item"
+                            onClick={() =>
+                              hapusBarang(index)
+                            }
+                            disabled={
+                              items.length === 1
+                            }
+                            title={
+                              items.length === 1
+                                ? "Minimal satu barang"
+                                : "Hapus barang"
+                            }
+                          >
+
+                            <Trash2
+                              size={14}
+                            />
+
+                          </button>
+
+                        </div>
+
+                      </div>
+
+                    )
                   )}
-                </strong>
 
+                </div>
+
+                {/* TOTAL */}
+
+                <div className="purchase-total">
+
+                  <span>
+                    Total Pembelian
+                  </span>
+
+                  <strong>
+                    {formatRupiah(
+                      totalPembelian
+                    )}
+                  </strong>
+
+                </div>
+
+                {/* SIMPAN */}
+
+                <div className="purchase-actions">
+
+                  <button
+                    className="btn-save"
+                    onClick={
+                      handleSimpanPembelian
+                    }
+                  >
+                    Simpan Pembelian
+                  </button>
+                </div>
               </div>
-
-
-              {/* SIMPAN */}
-
-              <button
-                className="btn-save"
-                onClick={
-                  handleSimpanPembelian
-                }
-              >
-                Simpan Pembelian
-              </button>
-
             </div>
-
           )}
-
         </section>
-
       </main>
-
     </div>
   );
 }
