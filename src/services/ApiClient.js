@@ -1,6 +1,6 @@
 const API_URL =
   import.meta.env.VITE_API_URL ||
-  "http://127.0.0.1:8000/api";
+  "VITE_API_URL=https://blustery-fedora-entitle.ngrok-free.dev/api";
 
 class ApiClient {
   constructor(baseUrl = API_URL) {
