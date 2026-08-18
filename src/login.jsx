@@ -1,143 +1,87 @@
-import { useState } from 'react';
-import './Login.css';
+import { useState } from "react";
+import AuthService from "../services/AuthService";
 
 function Login({ onLogin }) {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("admin@example.com");
+  const [password, setPassword] = useState("password");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (username === 'admin' && password === 'admin123') {
-      onLogin();
-    } else {
-      alert('Username atau password salah!');
+    setError("");
+    setLoading(true);
+
+    try {
+      const user = await AuthService.login(email, password);
+      onLogin(user);
+    } catch (err) {
+      setError(err.message || "Login gagal");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="login-page">
+    <div className="flex min-h-screen items-center justify-center bg-[#f4f7fc] px-5">
+      <div className="w-full max-w-[420px]">
+        <div className="rounded-[13px] border border-gray-200 bg-white p-[22px] shadow-[0_3px_10px_rgba(15,23,42,0.04)]">
 
-      {/* BAGIAN KIRI */}
-      <div className="login-left">
-        <div className="login-brand">
-          <div className="login-logo">
-            P
-          </div>
-          <div>
-            <h2>Purchase Management</h2>
-            <span>System</span>
-          </div>
-        </div>
-        <div className="login-description">
-          <h1>
-            Kelola Pembelian
-            <br />
-            Lebih Mudah.
-          </h1>
-          <p>
-            Sistem informasi pembelian untuk membantu mengelola pembelian secara lebih terstruktur.
-          </p>
-        </div>
-        <div className="login-info">
-          <div className="info-item">
-            <strong>Supplier</strong>
-            <span>Kelola data supplier</span>
-          </div>
-          <div className="info-item">
-            <strong>Barang</strong>
-            <span>Kelola data barang</span>
-          </div>
-          <div className="info-item">
-            <strong>Pembelian</strong>
-            <span>Kelola transaksi</span>
-          </div>
-        </div>
-      </div>
+          <div className="mb-6 border-b border-gray-200 pb-5">
+            <h3 className="text-[18px] font-semibold text-slate-900">
+              Login
+            </h3>
 
-      {/* BAGIAN KANAN */}
-      <div className="login-right">
-        <div className="login-box">
-          <div className="login-header">
-            <h1>Selamat Datang</h1>
-            <p>
-              Silakan masuk untuk melanjutkan
+            <p className="mt-1 text-[12px] text-slate-500">
+              Purchase Management System
             </p>
           </div>
-          <form onSubmit={handleSubmit}>
-            <div className="login-form-group">
-              <label>Username</label>
-              <div className="input-wrapper">
-                <span className="input-icon">
-                  👤
-                </span>
-                <input
-                  type="text"
-                  placeholder="Masukkan username"
-                  value={username}
-                  onChange={(e) =>
-                    setUsername(e.target.value)
-                  }
-                  required
-                />
-              </div>
+
+          {error && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-[12px] text-red-600">
+              {error}
             </div>
+          )}
 
-            <div className="login-form-group">
-              <label>Password</label>
-              <div className="input-wrapper">
-                <span className="input-icon">
-                  🔒
-                </span>
+          <form onSubmit={handleSubmit} className="space-y-[18px]">
 
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Masukkan password"
-                  value={password}
-                  onChange={(e) =>
-                    setPassword(e.target.value)
-                  }
-                  required
-                />
-
-                <button
-                  type="button"
-                  className="show-password"
-                  onClick={() =>
-                    setShowPassword(!showPassword)
-                  }
-                >
-                  {showPassword ? '🙈' : '👁'}
-                </button>
-              </div>
-            </div>
-
-            <div className="login-options">
-              <label className="remember">
-                <input type="checkbox" />
-                <span>Ingat saya</span>
+            <div>
+              <label className="mb-[7px] block text-[12px] font-medium text-slate-700">
+                Email
               </label>
 
-              <button
-                type="button"
-                className="forgot-password"
-              >
-                Lupa password?
-              </button>
+              <input
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                type="email"
+                required
+                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-[10px] text-[13px] text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+
+            <div>
+              <label className="mb-[7px] block text-[12px] font-medium text-slate-700">
+                Password
+              </label>
+
+              <input
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                type="password"
+                required
+                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-[10px] text-[13px] text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
             </div>
 
             <button
               type="submit"
-              className="login-button"
+              disabled={loading}
+              className="w-full rounded-lg bg-gradient-to-r from-[#2563eb] to-[#3b82f6] px-4 py-[10px] text-[13px] font-semibold text-white shadow-[0_5px_15px_rgba(37,99,235,0.2)] transition hover:-translate-y-[1px] hover:shadow-[0_8px_20px_rgba(37,99,235,0.25)] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Masuk
-              <span>→</span>
+              {loading ? "Memproses..." : "Login"}
             </button>
-          </form>
 
-          <div className="login-footer">
-            <span>© 2026 Purchase Management System</span>
-          </div>
+          </form>
         </div>
       </div>
     </div>
