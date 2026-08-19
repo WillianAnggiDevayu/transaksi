@@ -96,6 +96,37 @@ function Dashboard({
 
   const openDetail = async (transaction) => {
     setError("");
+
+    // Transaksi ini masih menunggu sinkronisasi (dibuat saat offline) dan
+    // belum punya tr_id asli di server, jadi tampilkan langsung dari data
+    // lokal tanpa memanggil API.
+    if (transaction._pendingSync) {
+      setSelectedTransaction({
+        id: transaction.id,
+        supplier_id: transaction.supplier_id,
+        supplier_name:
+          transaction.supplier ||
+          transaction.supplier_name ||
+          getSupplierName(transaction.supplier_id),
+        tanggal: transaction.tanggal,
+        payment_method: transaction.payment_method,
+        total: transaction.total || 0,
+        status: transaction.status || "pending",
+        _pendingSync: true,
+        details: (transaction.details || []).map((detail) => ({
+          tr_detail_id: detail.tr_detail_id,
+          item_id: detail.item_id,
+          item_name: detail.item_name || getItemName(detail.item_id),
+          item_quant: detail.item_quant,
+          item_price: detail.item_price,
+          subtotal:
+            detail.subtotal ??
+            Number(detail.item_quant || 0) * Number(detail.item_price || 0),
+        })),
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -416,6 +447,11 @@ function Dashboard({
                         getSupplierName(
                           item.supplier_id
                         )}
+                      {item._pendingSync && (
+                        <span className="ml-2 inline-flex items-center rounded-full bg-amber-50 px-2 py-[2px] text-[10px] font-medium text-amber-600">
+                          Menunggu sync
+                        </span>
+                      )}
                     </td>
 
                     <td className="px-3 py-[13px] text-[12px] font-medium text-slate-700">
@@ -724,7 +760,14 @@ function Dashboard({
                   Tutup
                 </button>
 
-                {selectedTransaction.status ===
+                {selectedTransaction._pendingSync && (
+                  <span className="text-xs text-slate-500">
+                    Menunggu sinkronisasi ke server...
+                  </span>
+                )}
+
+                {!selectedTransaction._pendingSync &&
+                  selectedTransaction.status ===
                   "pending" && (
                     <>
 

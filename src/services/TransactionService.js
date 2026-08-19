@@ -1,4 +1,5 @@
 import ApiClient from "./ApiClient";
+import OfflineQueue from "./OfflineQueue";
 
 class TransactionService {
   normalize(transaction) {
@@ -9,8 +10,15 @@ class TransactionService {
       transaction.data?.mstransactionsDetailTransactions ||
       [];
 
+    // Untuk transaksi yang masih tertunda (offline), field `subtotal`
+    // belum dihitung server, jadi fallback ke item_quant * item_price.
     const total = details.reduce(
-      (sum, detail) => sum + Number(detail.subtotal || 0),
+      (sum, detail) =>
+        sum +
+        Number(
+          detail.subtotal ??
+          Number(detail.item_quant || 0) * Number(detail.item_price || 0)
+        ),
       0
     );
 
@@ -38,62 +46,50 @@ class TransactionService {
   }
 
   async getAll() {
-    const response = await ApiClient.get("/transactions");
+    let rawItems = [];
 
-    const data = response?.data || response;
+    try {
+      const response = await ApiClient.get("/transactions");
+      const data = response?.data || response;
+      rawItems = Array.isArray(data) ? data : [];
+    } catch (err) {
+      console.warn("Gagal memuat data transaksi:", err.message);
+    }
 
-    return Array.isArray(data)
-      ? data.map((item) => this.normalize(item))
-      : [];
+    const items = rawItems.map((item) => this.normalize(item));
+
+    return OfflineQueue.mergeOptimistic("transactions", "tr_id", items, (raw) =>
+      this.normalize(raw)
+    );
   }
 
   async getById(id) {
     const response = await ApiClient.get(`/transactions/${id}`);
-
     const data = response?.data || response;
-
     return this.normalize(data);
   }
 
   async create(payload) {
-    const response = await ApiClient.post(
-      "/transactions",
-      payload
-    );
-
+    const response = await ApiClient.post("/transactions", payload);
     const data = response?.data || response;
-
     return this.normalize(data);
   }
 
   async update(id, payload) {
-    const response = await ApiClient.put(
-      `/transactions/${id}`,
-      payload
-    );
-
+    const response = await ApiClient.put(`/transactions/${id}`, payload);
     const data = response?.data || response;
-
     return this.normalize(data);
   }
 
   async complete(id) {
-    const response = await ApiClient.patch(
-      `/transactions/${id}/complete`
-    );
-
+    const response = await ApiClient.patch(`/transactions/${id}/complete`);
     const data = response?.data || response;
-
     return this.normalize(data);
   }
 
   async cancel(id) {
-    const response = await ApiClient.patch(
-      `/transactions/${id}/cancel`
-    );
-
+    const response = await ApiClient.patch(`/transactions/${id}/cancel`);
     const data = response?.data || response;
-
     return this.normalize(data);
   }
 

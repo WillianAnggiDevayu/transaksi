@@ -78,15 +78,24 @@ function Barang({ barang, setBarang, user }) {
         item_price: Number(form.item_price),
       };
 
+      let result;
+
       if (editingItem) {
-        await ItemService.update(editingItem.id, payload);
+        result = await ItemService.update(editingItem.id, payload);
       } else {
-        await ItemService.create(payload);
+        result = await ItemService.create(payload);
       }
 
       setBarang(await ItemService.getAll());
       setShowForm(false);
       setEditingItem(null);
+
+      if (result?.__offlineQueued) {
+        alert(
+          "Sedang offline. Barang disimpan sementara dan akan otomatis " +
+          "dikirim ke server saat koneksi tersedia kembali."
+        );
+      }
     } catch (err) {
       console.error(err);
 
@@ -203,6 +212,11 @@ function Barang({ barang, setBarang, user }) {
 
                   <td className="border-b border-gray-200 px-3 py-[13px] text-[12px] text-slate-700">
                     {item.nama}
+                    {item._pendingSync && (
+                      <span className="ml-2 inline-flex items-center rounded-full bg-amber-50 px-2 py-[2px] text-[10px] font-medium text-amber-600">
+                        Menunggu sync
+                      </span>
+                    )}
                   </td>
 
                   <td className="border-b border-gray-200 px-3 py-[13px] text-[12px] text-slate-700">
@@ -216,7 +230,7 @@ function Barang({ barang, setBarang, user }) {
                   </td>
 
                   <td className="border-b border-gray-200 px-3 py-[13px]">
-                    {user?.role === "admin" && (
+                    {user?.role === "admin" && !item._pendingSync && (
                       <div className="flex items-center gap-2">
                         <button
                           className="rounded-md bg-blue-50 px-3 py-[6px] text-[11px] font-medium text-blue-600 transition hover:bg-blue-100"
@@ -232,6 +246,12 @@ function Barang({ barang, setBarang, user }) {
                           Hapus
                         </button>
                       </div>
+                    )}
+
+                    {user?.role === "admin" && item._pendingSync && (
+                      <span className="text-[11px] text-slate-400">
+                        Menunggu sinkronisasi
+                      </span>
                     )}
                   </td>
                 </tr>
