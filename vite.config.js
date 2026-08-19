@@ -44,11 +44,10 @@ export default defineConfig({
         ],
       },
 
-      // Aktifkan service worker saat `npm run dev` supaya offline mode
-      // bisa langsung ditest tanpa perlu build dulu.
+
+      //   npm run build && npm run preview
       devOptions: {
-        enabled: true,
-        type: "module",
+        enabled: false,
       },
 
       workbox: {
