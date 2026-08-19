@@ -1,4 +1,5 @@
 import ApiClient from "./ApiClient";
+import OfflineQueue from "./OfflineQueue";
 
 class ItemService {
   normalize(item) {
@@ -10,11 +11,26 @@ class ItemService {
       harga: item.item_price,
     };
   }
+
   async getAll() {
-    const response = await ApiClient.get("/items");
-    const data = response?.data || response;
-    return Array.isArray(data) ? data.map((item) => this.normalize(item)) : [];
+    let rawItems = [];
+
+    try {
+      const response = await ApiClient.get("/items");
+      const data = response?.data || response;
+      rawItems = Array.isArray(data) ? data : [];
+    } catch (err) {
+      // Tidak ada koneksi & tidak ada cache dari service worker.
+      console.warn("Gagal memuat data barang:", err.message);
+    }
+
+    const items = rawItems.map((item) => this.normalize(item));
+
+    return OfflineQueue.mergeOptimistic("items", "item_id", items, (raw) =>
+      this.normalize(raw)
+    );
   }
+
   async getById(id) { return ApiClient.get(`/items/${id}`); }
   async create(payload) { return ApiClient.post("/items", payload); }
   async update(id, payload) { return ApiClient.put(`/items/${id}`, payload); }

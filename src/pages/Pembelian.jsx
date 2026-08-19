@@ -100,25 +100,48 @@ function Pembelian({ supplier, barang, setPembelian }) {
       return;
     }
 
-    const details = items.map((item) => ({
-      item_id: item.barangId,
-      item_quant: Number(item.jumlah),
-      item_price: Number(item.harga),
-    }));
+    const supplierDipilihObj = supplier.find(
+      (item) => item.id === supplierDipilih
+    );
+
+    const details = items.map((item) => {
+      const barangDipilih = barang.find((b) => b.id === item.barangId);
+
+      return {
+        item_id: item.barangId,
+        item_quant: Number(item.jumlah),
+        item_price: Number(item.harga),
+
+        // Field tambahan di bawah ini HANYA dipakai untuk tampilan optimistic
+        // ketika transaksi tersimpan offline (menunggu sinkronisasi).
+        // Backend Laravel mengabaikan field yang tidak divalidasi, jadi aman dikirim.
+        subtotal: Number(item.harga) * Number(item.jumlah),
+        item_name: barangDipilih?.nama,
+      };
+    });
 
     try {
-      await TransactionService.create({
+      const result = await TransactionService.create({
         supplier_id: supplierDipilih,
+        supplier_name: supplierDipilihObj?.nama, // display-only, lihat catatan di atas
         tr_date: tanggalPembelian,
         payment_method: paymentMethod,
         details,
       });
 
-      alert(
-        `Pembelian berhasil disimpan sebagai transaksi pending.\nTotal: ${formatRupiah(
-          totalPembelian
-        )}`
-      );
+      if (result?.__offlineQueued) {
+        alert(
+          `Sedang offline. Transaksi disimpan sementara di perangkat ini\n` +
+          `dan akan otomatis dikirim ke server saat koneksi tersedia kembali.\n` +
+          `Total: ${formatRupiah(totalPembelian)}`
+        );
+      } else {
+        alert(
+          `Pembelian berhasil disimpan sebagai transaksi pending.\nTotal: ${formatRupiah(
+            totalPembelian
+          )}`
+        );
+      }
 
       const transactions = await TransactionService.getAll();
       setPembelian(transactions);

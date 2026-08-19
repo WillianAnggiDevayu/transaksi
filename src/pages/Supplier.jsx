@@ -6,12 +6,6 @@ import SupplierFormModal from "../pages/modal/SupplierFormModal";
 function Supplier({ supplier, setSupplier, user }) {
   const [search, setSearch] = useState("");
 
-  const [showForm, setShowForm] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-
-  const [editingItem, setEditingItem] = useState(null);
-  const [deletingItem, setDeletingItem] = useState(null);
-
   const tambahSupplier = async () => {
     const nama = window.prompt("Nama Supplier");
     if (!nama) return;
@@ -23,13 +17,20 @@ function Supplier({ supplier, setSupplier, user }) {
     if (address === null) return;
 
     try {
-      await SupplierService.create({
+      const result = await SupplierService.create({
         supplier_name: nama,
         phone: telepon,
         address,
       });
 
       setSupplier(await SupplierService.getAll());
+
+      if (result?.__offlineQueued) {
+        alert(
+          "Sedang offline. Supplier disimpan sementara dan akan otomatis " +
+          "dikirim ke server saat koneksi tersedia kembali."
+        );
+      }
     } catch (err) {
       alert(err.message);
     }
@@ -153,6 +154,11 @@ function Supplier({ supplier, setSupplier, user }) {
 
                   <td className="px-5 py-4 text-sm font-medium text-slate-800">
                     {item.nama}
+                    {item._pendingSync && (
+                      <span className="ml-2 inline-flex items-center rounded-full bg-amber-50 px-2 py-[2px] text-[10px] font-medium text-amber-600">
+                        Menunggu sync
+                      </span>
+                    )}
                   </td>
 
                   <td className="px-5 py-4 text-sm text-slate-600">
@@ -160,7 +166,7 @@ function Supplier({ supplier, setSupplier, user }) {
                   </td>
 
                   <td className="px-5 py-4">
-                    {user?.role === "admin" && (
+                    {user?.role === "admin" && !item._pendingSync && (
                       <div className="flex items-center justify-center gap-2">
                         <button
                           type="button"
@@ -177,6 +183,12 @@ function Supplier({ supplier, setSupplier, user }) {
                         >
                           Hapus
                         </button>
+                      </div>
+                    )}
+
+                    {user?.role === "admin" && item._pendingSync && (
+                      <div className="text-center text-xs text-slate-400">
+                        Menunggu sinkronisasi
                       </div>
                     )}
                   </td>
