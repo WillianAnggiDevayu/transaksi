@@ -43,12 +43,14 @@ function ItemPage() {
   const filtered = useMemo(() => {
     const keyword = search.toLowerCase().trim();
 
-    return items.filter((item) =>
-      `${item.item_name || ""} ${item.unit?.unit_name || ""}`
+    return items.filter((item) => {
+      const unit = units.find((unit) => unit.unit_id === item.unit_id);
+
+      return `${item.item_name || ""} ${unit?.unit_code || ""}`
         .toLowerCase()
-        .includes(keyword)
-    );
-  }, [items, search]);
+        .includes(keyword);
+    });
+  }, [items, units, search]);
 
   const openCreate = () => {
     setEditing(null);
@@ -186,7 +188,7 @@ function ItemPage() {
                       {item.item_name}
                     </td>
                     <td className="px-5 py-4 text-sm text-slate-600">
-                      {item.unit?.unit_name || item.unit_id || "-"}
+                      {units.find((unit) => unit.unit_id === item.unit_id)?.unit_code || "-"}
                     </td>
                     <td className="px-5 py-4 text-sm text-slate-600">{item.stock}</td>
                     <td className="px-5 py-4">

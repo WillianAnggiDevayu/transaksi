@@ -225,10 +225,10 @@ function Login({ onLogin }) {
                       "
                     >
                       {showPassword ? (
-                  <Eye size={17} />
-                ) : (
-                  <EyeOff size={17} />
-                )}
+                        <Eye size={17} />
+                      ) : (
+                        <EyeOff size={17} />
+                      )}
                     </button>
 
                   </div>

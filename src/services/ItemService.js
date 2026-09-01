@@ -8,7 +8,6 @@ class ItemService {
       id: item.item_id,
       nama: item.item_name,
       stok: item.stock,
-      harga: item.item_price,
       unit_id: item.unit_id,
       unit: item.unit || null,
     };
@@ -46,7 +45,7 @@ class ItemService {
   async create(payload) {
     return ApiClient.post("/items", {
       item_name: payload.item_name,
-      item_price: payload.item_price,
+      stock: payload.stock,
       unit_id: payload.unit_id,
     });
   }
@@ -54,7 +53,7 @@ class ItemService {
   async update(id, payload) {
     return ApiClient.put(`/items/${id}`, {
       item_name: payload.item_name,
-      item_price: payload.item_price,
+      stock: payload.stock,
       unit_id: payload.unit_id,
     });
   }

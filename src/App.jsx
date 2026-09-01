@@ -1,7 +1,7 @@
 import { useState } from "react";
 import AuthService from "./services/AuthService";
 import Login from "./pages/Login";
-import AdminPanel from "./pages/pages/admin/AdminPanel";
+import AdminPanel from "./pages/admin/AdminPanel";
 import AdminAkuntanPanel from "./pages/admin-akuntan/AdminAkuntanPanel";
 import SupplierPanel from "./pages/supplier/SupplierPanel";
 
