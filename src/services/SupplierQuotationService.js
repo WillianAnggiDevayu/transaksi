@@ -1,12 +1,24 @@
 import ApiClient from "./ApiClient";
+import CacheStore from "./CacheStore";
+
+const CACHE_KEY = "supplier-quotations";
 
 class SupplierQuotationService {
     async getAll() {
+        if (CacheStore.has(CACHE_KEY)) {
+            return CacheStore.get(CACHE_KEY);
+        }
+
         const response = await ApiClient.get(
             "/supplier-quotations"
         );
 
-        return response?.data || response;
+        const result = response?.data || response;
+        const data = Array.isArray(result) ? result : [];
+
+        CacheStore.set(CACHE_KEY, data);
+
+        return data;
     }
 
     async getRequestDetail(requestSupplierId) {
@@ -18,17 +30,25 @@ class SupplierQuotationService {
     }
 
     async create(requestSupplierId, payload) {
-        return ApiClient.post(
+        const result = await ApiClient.post(
             `/supplier-quotations/request-suppliers/${requestSupplierId}`,
             payload
         );
+
+        CacheStore.clear(CACHE_KEY);
+
+        return result;
     }
 
     async updateHeader(quotationId, payload) {
-        return ApiClient.patch(
+        const result = await ApiClient.patch(
             `/supplier-quotations/${quotationId}`,
             payload
         );
+
+        CacheStore.clear(CACHE_KEY);
+
+        return result;
     }
 
     async updateDetail(
@@ -36,10 +56,14 @@ class SupplierQuotationService {
         detailId,
         payload
     ) {
-        return ApiClient.patch(
+        const result = await ApiClient.patch(
             `/supplier-quotations/${quotationId}/details/${detailId}`,
             payload
         );
+
+        CacheStore.clear(CACHE_KEY);
+
+        return result;
     }
 }
 

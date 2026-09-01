@@ -1,5 +1,8 @@
 import ApiClient from "./ApiClient";
 import OfflineQueue from "./OfflineQueue";
+import CacheStore from "./CacheStore";
+
+const CACHE_KEY = "purchase-requests";
 
 class PurchaseRequestService {
     normalize(item) {
@@ -16,10 +19,17 @@ class PurchaseRequestService {
     }
 
     async getAll() {
+        if (CacheStore.has(CACHE_KEY)) {
+            return CacheStore.get(CACHE_KEY);
+        }
+
         let rawItems = [];
 
         try {
-            const response = await ApiClient.get("/purchase-requests");
+            const response = await ApiClient.get(
+                "/purchase-requests"
+            );
+
             const data = response?.data || response;
 
             rawItems = Array.isArray(data) ? data : [];
@@ -34,12 +44,16 @@ class PurchaseRequestService {
             this.normalize(item)
         );
 
-        return OfflineQueue.mergeOptimistic(
+        const result = OfflineQueue.mergeOptimistic(
             "purchase-requests",
             "purchase_request_id",
             items,
             (raw) => this.normalize(raw)
         );
+
+        CacheStore.set(CACHE_KEY, result);
+
+        return result;
     }
 
     async getById(id) {
@@ -53,27 +67,46 @@ class PurchaseRequestService {
     }
 
     async create(payload) {
-        return ApiClient.post("/purchase-requests", payload);
+        const result = await ApiClient.post(
+            "/purchase-requests",
+            payload
+        );
+
+        CacheStore.clear(CACHE_KEY);
+
+        return result;
     }
 
     async addDetail(id, payload) {
-        return ApiClient.post(
+        const result = await ApiClient.post(
             `/purchase-requests/${id}/details`,
             payload
         );
+
+        CacheStore.clear(CACHE_KEY);
+
+        return result;
     }
 
     async updateDetail(id, detailId, payload) {
-        return ApiClient.patch(
+        const result = await ApiClient.patch(
             `/purchase-requests/${id}/details/${detailId}`,
             payload
         );
+
+        CacheStore.clear(CACHE_KEY);
+
+        return result;
     }
 
     async deleteDetail(id, detailId) {
-        return ApiClient.delete(
+        const result = await ApiClient.delete(
             `/purchase-requests/${id}/details/${detailId}`
         );
+
+        CacheStore.clear(CACHE_KEY);
+
+        return result;
     }
 }
 

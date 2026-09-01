@@ -1,26 +1,60 @@
 import ApiClient from "./ApiClient";
+import CacheStore from "./CacheStore";
+
+const CACHE_KEY = "units";
 
 class UnitService {
     async getAll() {
+        if (CacheStore.has(CACHE_KEY)) {
+            return CacheStore.get(CACHE_KEY);
+        }
+
         const response = await ApiClient.get("/units");
-        return response?.data || response;
+        const result = response?.data || response;
+
+        const data = Array.isArray(result) ? result : [];
+
+        CacheStore.set(CACHE_KEY, data);
+
+        return data;
     }
 
     async getById(id) {
         const response = await ApiClient.get(`/units/${id}`);
+
         return response?.data || response;
     }
 
     async create(payload) {
-        return ApiClient.post("/units", payload);
+        const result = await ApiClient.post(
+            "/units",
+            payload
+        );
+
+        CacheStore.clear(CACHE_KEY);
+
+        return result;
     }
 
     async update(id, payload) {
-        return ApiClient.put(`/units/${id}`, payload);
+        const result = await ApiClient.put(
+            `/units/${id}`,
+            payload
+        );
+
+        CacheStore.clear(CACHE_KEY);
+
+        return result;
     }
 
     async delete(id) {
-        return ApiClient.delete(`/units/${id}`);
+        const result = await ApiClient.delete(
+            `/units/${id}`
+        );
+
+        CacheStore.clear(CACHE_KEY);
+
+        return result;
     }
 }
 

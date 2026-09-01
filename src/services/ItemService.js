@@ -1,5 +1,8 @@
 import ApiClient from "./ApiClient";
 import OfflineQueue from "./OfflineQueue";
+import CacheStore from "./CacheStore";
+
+const CACHE_KEY = "items";
 
 class ItemService {
   normalize(item) {
@@ -14,25 +17,12 @@ class ItemService {
   }
 
   async getAll() {
-    let rawItems = [];
+    const response = await ApiClient.get("/items");
+    const data = response?.data || response;
 
-    try {
-      const response = await ApiClient.get("/items");
-      const data = response?.data || response;
-
-      rawItems = Array.isArray(data) ? data : [];
-    } catch (err) {
-      console.warn("Gagal memuat data barang:", err.message);
-    }
-
-    const items = rawItems.map((item) => this.normalize(item));
-
-    return OfflineQueue.mergeOptimistic(
-      "items",
-      "item_id",
-      items,
-      (raw) => this.normalize(raw)
-    );
+    return Array.isArray(data)
+      ? data.map((item) => this.normalize(item))
+      : [];
   }
 
   async getById(id) {
@@ -43,23 +33,35 @@ class ItemService {
   }
 
   async create(payload) {
-    return ApiClient.post("/items", {
+    const result = await ApiClient.post("/items", {
       item_name: payload.item_name,
       stock: payload.stock,
       unit_id: payload.unit_id,
     });
+
+    CacheStore.clear(CACHE_KEY);
+
+    return result;
   }
 
   async update(id, payload) {
-    return ApiClient.put(`/items/${id}`, {
+    const result = await ApiClient.put(`/items/${id}`, {
       item_name: payload.item_name,
       stock: payload.stock,
       unit_id: payload.unit_id,
     });
+
+    CacheStore.clear(CACHE_KEY);
+
+    return result;
   }
 
   async delete(id) {
-    return ApiClient.delete(`/items/${id}`);
+    const result = await ApiClient.delete(`/items/${id}`);
+
+    CacheStore.clear(CACHE_KEY);
+
+    return result;
   }
 }
 

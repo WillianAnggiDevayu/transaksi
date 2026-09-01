@@ -1,12 +1,24 @@
 import ApiClient from "./ApiClient";
+import CacheStore from "./CacheStore";
+
+const CACHE_KEY = "purchase-orders";
 
 class PurchaseOrderService {
     async getAll() {
+        if (CacheStore.has(CACHE_KEY)) {
+            return CacheStore.get(CACHE_KEY);
+        }
+
         const response = await ApiClient.get(
             "/purchase-orders"
         );
 
-        return response?.data || response;
+        const result = response?.data || response;
+        const data = Array.isArray(result) ? result : [];
+
+        CacheStore.set(CACHE_KEY, data);
+
+        return data;
     }
 
     async getById(id) {
@@ -21,24 +33,36 @@ class PurchaseOrderService {
         supplierQuotationId,
         payload
     ) {
-        return ApiClient.post(
+        const result = await ApiClient.post(
             `/supplier-quotations/${supplierQuotationId}/purchase-order`,
             payload
         );
+
+        CacheStore.clear(CACHE_KEY);
+
+        return result;
     }
 
     async update(id, payload) {
-        return ApiClient.patch(
+        const result = await ApiClient.patch(
             `/purchase-orders/${id}`,
             payload
         );
+
+        CacheStore.clear(CACHE_KEY);
+
+        return result;
     }
 
     async updateStatus(id, status) {
-        return ApiClient.patch(
+        const result = await ApiClient.patch(
             `/purchase-orders/${id}/status`,
             { status }
         );
+
+        CacheStore.clear(CACHE_KEY);
+
+        return result;
     }
 }
 

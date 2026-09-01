@@ -1,5 +1,8 @@
 import ApiClient from "./ApiClient";
 import OfflineQueue from "./OfflineQueue";
+import CacheStore from "./CacheStore";
+
+const CACHE_KEY = "suppliers";
 
 class SupplierService {
   normalize(item) {
@@ -12,26 +15,52 @@ class SupplierService {
   }
 
   async getAll() {
-    let rawItems = [];
+    const response = await ApiClient.get("/suppliers");
+    const data = response?.data || response;
 
-    try {
-      const response = await ApiClient.get("/suppliers");
-      const data = response?.data || response;
-      rawItems = Array.isArray(data) ? data : [];
-    } catch (err) {
-      console.warn("Gagal memuat data supplier:", err.message);
-    }
-
-    const items = rawItems.map((item) => this.normalize(item));
-
-    return OfflineQueue.mergeOptimistic("suppliers", "supplier_id", items, (raw) =>
-      this.normalize(raw)
-    );
+    return Array.isArray(data)
+      ? data.map((item) => this.normalize(item))
+      : [];
   }
 
-  async getById(id) { return ApiClient.get(`/suppliers/${id}`); }
-  async create(payload) { return ApiClient.post("/suppliers", payload); }
-  async update(id, payload) { return ApiClient.put(`/suppliers/${id}`, payload); }
-  async delete(id) { return ApiClient.delete(`/suppliers/${id}`); }
+  async getById(id) {
+    const response = await ApiClient.get(`/suppliers/${id}`);
+    const data = response?.data || response;
+
+    return this.normalize(data);
+  }
+
+  async create(payload) {
+    const result = await ApiClient.post(
+      "/suppliers",
+      payload
+    );
+
+    CacheStore.clear(CACHE_KEY);
+
+    return result;
+  }
+
+  async update(id, payload) {
+    const result = await ApiClient.put(
+      `/suppliers/${id}`,
+      payload
+    );
+
+    CacheStore.clear(CACHE_KEY);
+
+    return result;
+  }
+
+  async delete(id) {
+    const result = await ApiClient.delete(
+      `/suppliers/${id}`
+    );
+
+    CacheStore.clear(CACHE_KEY);
+
+    return result;
+  }
 }
+
 export default new SupplierService();
