@@ -2,7 +2,7 @@ import OfflineQueue from "./OfflineQueue";
 
 const API_URL =
   import.meta.env.VITE_API_URL ||
-  "https://blustery-fedora-entitle.ngrok-free.dev/api";
+  "http://127.0.0.1:8000/api";
 
 class ApiClient {
   constructor(baseUrl = API_URL) {
