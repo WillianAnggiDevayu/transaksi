@@ -15,6 +15,10 @@ const menus = [
   { key: "units", label: "Unit", icon: Ruler },
   { key: "suppliers", label: "Supplier", icon: Truck },
   { key: "users", label: "User", icon: UserRound },
+  { key: "procurementDashboard", label: "Procurement", icon: LayoutDashboard },
+  { key: "purchaseRequests", label: "Purchase Request", icon: LayoutDashboard },
+  { key: "purchaseOrders", label: "Purchase Order", icon: LayoutDashboard },
+  { key: "payments", label: "Pembayaran", icon: LayoutDashboard },
 ];
 
 function AdminSidebar({
@@ -36,9 +40,8 @@ function AdminSidebar({
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-slate-200 bg-white transition-transform lg:translate-x-0 ${
-          mobileOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-slate-200 bg-white transition-transform lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
       >
         <div className="flex h-16 items-center justify-between border-b border-slate-200 px-5">
           <div>
@@ -71,11 +74,10 @@ function AdminSidebar({
                 key={item.key}
                 type="button"
                 onClick={() => setMenu(item.key)}
-                className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition ${
-                  active
+                className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition ${active
                     ? "bg-blue-50 text-blue-700"
                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                }`}
+                  }`}
               >
                 <Icon size={18} />
                 <span className="flex-1">{item.label}</span>

@@ -1,18 +1,33 @@
 import { useEffect, useState } from "react";
+
 import AdminSidebar from "./components/AdminSidebar";
 import AdminHeader from "./components/AdminHeader";
+
 import DashboardAdmin from "./DashboardAdmin";
 import ItemPage from "./ItemPage";
 import UnitPage from "./UnitPage";
 import SupplierPage from "./SupplierPage";
 import UserPage from "./UserPage";
 
+import DashboardProcurement from "../admin-akuntan/DashboardProcurement";
+import PurchaseRequestPage from "../admin-akuntan/PurchaseRequestPage";
+import PurchaseOrderPage from "../admin-akuntan/PurchaseOrderPage";
+import PaymentPage from "../admin-akuntan/PaymentPage";
+
 const MENU = {
   dashboard: "dashboard",
+
+  // Master Data
   items: "items",
   units: "units",
   suppliers: "suppliers",
   users: "users",
+
+  // Procurement / Akuntansi
+  procurementDashboard: "procurementDashboard",
+  purchaseRequests: "purchaseRequests",
+  purchaseOrders: "purchaseOrders",
+  payments: "payments",
 };
 
 function AdminPanel({ user, onLogout }) {
@@ -23,13 +38,20 @@ function AdminPanel({ user, onLogout }) {
     setMobileOpen(false);
   }, [menu]);
 
-  const page = {
+  const pages = {
+    // Admin
     dashboard: <DashboardAdmin />,
     items: <ItemPage />,
     units: <UnitPage />,
     suppliers: <SupplierPage />,
     users: <UserPage currentUser={user} />,
-  }[menu];
+
+    // Akuntan / Procurement
+    procurementDashboard: <DashboardProcurement />,
+    purchaseRequests: <PurchaseRequestPage />,
+    purchaseOrders: <PurchaseOrderPage />,
+    payments: <PaymentPage />,
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800">
@@ -49,7 +71,7 @@ function AdminPanel({ user, onLogout }) {
 
         <main className="p-4 sm:p-6 lg:p-8">
           <div className="mx-auto max-w-7xl">
-            {page}
+            {pages[menu]}
           </div>
         </main>
       </div>
