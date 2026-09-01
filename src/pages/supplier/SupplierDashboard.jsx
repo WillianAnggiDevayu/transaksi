@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from "react";
 import {
   ClipboardList,
   FileText,
@@ -6,125 +7,190 @@ import {
   Clock3,
   ArrowRight,
 } from "lucide-react";
+import SupplierQuotationService from "../../services/SupplierQuotationService";
+import PurchaseOrderService from "../../services/PurchaseOrderService";
 
-function SupplierDashboard() {
-  // DATA DUMMY
-  const requestOrders = [
-    {
-      id: "REQ-001",
-      tanggal: "2026-08-24",
-      jumlahItem: 3,
-      status: "pending",
-    },
-    {
-      id: "REQ-002",
-      tanggal: "2026-08-23",
-      jumlahItem: 5,
-      status: "quotation",
-    },
-    {
-      id: "REQ-003",
-      tanggal: "2026-08-22",
-      jumlahItem: 2,
-      status: "completed",
-    },
-  ];
+// FORMAT RUPIAH
+const formatRupiah = (value) =>
+  new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    minimumFractionDigits: 0,
+  }).format(Number(value || 0));
 
-  const purchaseOrders = [
-    {
-      id: "PO-001",
-      tanggal: "2026-08-24",
-      total: 1500000,
-      status: "pending",
-    },
-    {
-      id: "PO-002",
-      tanggal: "2026-08-23",
-      total: 2500000,
-      status: "approved",
-    },
-    {
-      id: "PO-003",
-      tanggal: "2026-08-21",
-      total: 850000,
-      status: "completed",
-    },
-  ];
+// STATUS REQUEST SUPPLIER (status asli dari backend: pending, accepted, rejected, selected, not_selected)
+const getRequestStatusClass = (status) => {
+  switch (status) {
+    case "accepted":
+      return "bg-blue-50 text-blue-700";
+    case "selected":
+      return "bg-emerald-50 text-emerald-700";
+    case "rejected":
+    case "not_selected":
+      return "bg-red-50 text-red-700";
+    default:
+      return "bg-amber-50 text-amber-700";
+  }
+};
 
-  // FORMAT RUPIAH
-  const formatRupiah = (value) => {
-    return new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-      minimumFractionDigits: 0,
-    }).format(value);
-  };
+const getRequestStatusLabel = (status) => {
+  switch (status) {
+    case "accepted":
+      return "Diterima";
+    case "selected":
+      return "Terpilih";
+    case "rejected":
+      return "Ditolak";
+    case "not_selected":
+      return "Tidak Terpilih";
+    default:
+      return "Menunggu Respons";
+  }
+};
 
-  // STATUS REQUEST
-  const getRequestStatusClass = (status) => {
-    switch (status) {
-      case "quotation":
-        return "bg-blue-50 text-blue-700";
-      case "completed":
-        return "bg-emerald-50 text-emerald-700";
-      default:
-        return "bg-amber-50 text-amber-700";
+// STATUS PO (status asli dari backend: draft, sent, accepted, shipping, delivered, completed, failed, cancelled)
+const getPOStatusClass = (status) => {
+  switch (status) {
+    case "accepted":
+    case "sent":
+      return "bg-blue-50 text-blue-700";
+    case "shipping":
+      return "bg-violet-50 text-violet-700";
+    case "delivered":
+    case "completed":
+      return "bg-emerald-50 text-emerald-700";
+    case "failed":
+    case "cancelled":
+      return "bg-red-50 text-red-700";
+    default:
+      return "bg-amber-50 text-amber-700";
+  }
+};
+
+const getPOStatusLabel = (status) => {
+  switch (status) {
+    case "sent":
+      return "Dikirim";
+    case "accepted":
+      return "Diterima";
+    case "shipping":
+      return "Pengiriman";
+    case "delivered":
+      return "Barang Diterima";
+    case "completed":
+      return "Selesai";
+    case "failed":
+      return "Gagal";
+    case "cancelled":
+      return "Dibatalkan";
+    default:
+      return "Draft";
+  }
+};
+
+function SupplierDashboard({ onNavigate }) {
+  const [requestOrders, setRequestOrders] = useState([]);
+  const [purchaseOrders, setPurchaseOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const load = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const [requests, orders] = await Promise.all([
+        SupplierQuotationService.getAll(),
+        PurchaseOrderService.getAll(),
+      ]);
+
+      setRequestOrders(Array.isArray(requests) ? requests : []);
+      setPurchaseOrders(Array.isArray(orders) ? orders : []);
+    } catch (err) {
+      setError(
+        err?.data?.message ||
+        err.message ||
+        "Gagal memuat data dashboard supplier."
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getRequestStatusLabel = (status) => {
-    switch (status) {
-      case "quotation":
-        return "Penawaran";
+  useEffect(() => {
+    load();
+  }, []);
 
-      case "completed":
-        return "Selesai";
-
-      default:
-        return "Pending";
-    }
-  };
-
-  // STATUS PO
-  const getPOStatusClass = (status) => {
-    switch (status) {
-      case "approved":
-        return "bg-blue-50 text-blue-700";
-      case "completed":
-        return "bg-emerald-50 text-emerald-700";
-      case "cancelled":
-        return "bg-red-50 text-red-700";
-      default:
-        return "bg-amber-50 text-amber-700";
-    }
-  };
-
-  const getPOStatusLabel = (status) => {
-    switch (status) {
-      case "approved":
-        return "Disetujui";
-      case "completed":
-        return "Selesai";
-      case "cancelled":
-        return "Dibatalkan";
-      default:
-        return "Pending";
-    }
-  };
   // PERHITUNGAN DASHBOARD
-  const requestBaru = requestOrders.filter(
-    (item) => item.status === "pending"
-  ).length;
+  const requestBaru = useMemo(
+    () => requestOrders.filter((item) => item.status === "pending").length,
+    [requestOrders]
+  );
 
-  const menungguPenawaran = requestOrders.filter(
-    (item) => item.status === "pending"
-  ).length;
+  // Request yang sudah diterima supplier tapi belum dibuatkan quotation
+  const menungguPenawaran = useMemo(
+    () =>
+      requestOrders.filter(
+        (item) =>
+          item.status === "accepted" &&
+          !item.request_supplier_supplier_quotation
+      ).length,
+    [requestOrders]
+  );
 
   const totalPO = purchaseOrders.length;
 
-  const poSelesai = purchaseOrders.filter(
-    (item) => item.status === "completed"
-  ).length;
+  const poPending = useMemo(
+    () =>
+      purchaseOrders.filter((item) =>
+        ["draft", "sent"].includes(item.status)
+      ).length,
+    [purchaseOrders]
+  );
+
+  const poSelesai = useMemo(
+    () =>
+      purchaseOrders.filter((item) => item.status === "completed").length,
+    [purchaseOrders]
+  );
+
+  // TERBARU (diurutkan tanggal terbaru, ambil 5)
+  const latestRequestOrders = useMemo(() => {
+    return [...requestOrders]
+      .sort(
+        (a, b) =>
+          new Date(b.sent_at || 0).getTime() -
+          new Date(a.sent_at || 0).getTime()
+      )
+      .slice(0, 5);
+  }, [requestOrders]);
+
+  const latestPurchaseOrders = useMemo(() => {
+    return [...purchaseOrders]
+      .sort(
+        (a, b) =>
+          new Date(b.order_date || 0).getTime() -
+          new Date(a.order_date || 0).getTime()
+      )
+      .slice(0, 5);
+  }, [purchaseOrders]);
+
+  const itemCount = (row) =>
+    row.request_supplier_purchase_request
+      ?.purchase_request_detail_purchase_request?.length || 0;
+
+  const requestNumber = (row) =>
+    row.request_supplier_purchase_request?.request_number ||
+    row.purchase_request_id ||
+    "-";
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[200px] items-center justify-center text-sm text-slate-500">
+        Memuat dashboard...
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-[22px]">
@@ -139,6 +205,13 @@ function SupplierDashboard() {
           Ringkasan aktivitas request order dan purchase order.
         </p>
       </div>
+
+      {/* ERROR */}
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700">
+          {error}
+        </div>
+      )}
 
       {/* STATISTIK */}
 
@@ -275,7 +348,11 @@ function SupplierDashboard() {
 
           {/* REQUEST */}
 
-          <div className="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3">
+          <button
+            type="button"
+            onClick={() => onNavigate?.("requestOrder")}
+            className="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3 text-left transition hover:bg-slate-50"
+          >
 
             <div className="flex items-center gap-3">
 
@@ -301,11 +378,15 @@ function SupplierDashboard() {
               Proses
             </span>
 
-          </div>
+          </button>
 
           {/* PO PENDING */}
 
-          <div className="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3">
+          <button
+            type="button"
+            onClick={() => onNavigate?.("purchaseOrder")}
+            className="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3 text-left transition hover:bg-slate-50"
+          >
 
             <div className="flex items-center gap-3">
 
@@ -320,12 +401,7 @@ function SupplierDashboard() {
                 </p>
 
                 <p className="mt-0.5 text-[11px] text-slate-400">
-                  {
-                    purchaseOrders.filter(
-                      (item) => item.status === "pending"
-                    ).length
-                  }{" "}
-                  purchase order
+                  {poPending} purchase order
                 </p>
 
               </div>
@@ -336,7 +412,7 @@ function SupplierDashboard() {
               Proses
             </span>
 
-          </div>
+          </button>
 
           {/* PO SELESAI */}
 
@@ -372,7 +448,7 @@ function SupplierDashboard() {
 
       </div>
 
-      {/* REQUEST ORDER TERBARU */}
+      {/* REQUEST ORDER & PURCHASE ORDER TERBARU */}
       <div className="grid grid-cols-1 gap-[18px] xl:grid-cols-2">
 
         <div className="rounded-[13px] border border-gray-200 bg-white p-[22px] shadow-[0_3px_10px_rgba(15,23,42,0.02)]">
@@ -399,21 +475,21 @@ function SupplierDashboard() {
 
           <div className="space-y-2">
 
-            {requestOrders.map((item) => (
+            {latestRequestOrders.map((item) => (
 
               <div
-                key={item.id}
+                key={item.request_supplier_id}
                 className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-3 transition hover:bg-slate-50"
               >
 
                 <div>
 
                   <p className="text-[12px] font-semibold text-slate-700">
-                    {item.id}
+                    {requestNumber(item)}
                   </p>
 
                   <p className="mt-0.5 text-[11px] text-slate-400">
-                    {item.tanggal} · {item.jumlahItem} item
+                    {item.sent_at || "-"} · {itemCount(item)} item
                   </p>
 
                 </div>
@@ -438,6 +514,12 @@ function SupplierDashboard() {
               </div>
 
             ))}
+
+            {latestRequestOrders.length === 0 && (
+              <p className="py-6 text-center text-[12px] text-slate-400">
+                Belum ada request order.
+              </p>
+            )}
 
           </div>
 
@@ -468,21 +550,21 @@ function SupplierDashboard() {
 
           <div className="space-y-2">
 
-            {purchaseOrders.map((item) => (
+            {latestPurchaseOrders.map((item) => (
 
               <div
-                key={item.id}
+                key={item.purchase_order_id}
                 className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-3 transition hover:bg-slate-50"
               >
 
                 <div>
 
                   <p className="text-[12px] font-semibold text-slate-700">
-                    {item.id}
+                    {item.po_number}
                   </p>
 
                   <p className="mt-0.5 text-[11px] text-slate-400">
-                    {item.tanggal}
+                    {item.order_date}
                   </p>
 
                 </div>
@@ -515,6 +597,12 @@ function SupplierDashboard() {
               </div>
 
             ))}
+
+            {latestPurchaseOrders.length === 0 && (
+              <p className="py-6 text-center text-[12px] text-slate-400">
+                Belum ada purchase order.
+              </p>
+            )}
 
           </div>
 

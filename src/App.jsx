@@ -28,7 +28,10 @@ function App() {
   }
 
   if (user?.role === "supplier") {
-    return <SupplierPanel user={user} onLogout={handleLogout} />;
+    return <SupplierPanel user={user} onLogout={async () => {
+      await AuthService.logout();
+      setUser(null);
+    }} />;
   }
 
   return (
