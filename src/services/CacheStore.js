@@ -54,6 +54,12 @@ const CacheStore = {
             }
         };
     },
+
+    clearAll() {
+        for (const key of Array.from(store.keys())) {
+            this.clear(key);
+        }
+    },
 };
 
 export default CacheStore;
