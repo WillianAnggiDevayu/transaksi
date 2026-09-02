@@ -13,7 +13,6 @@ function RequestOrder() {
   const [prices, setPrices] = useState({});
   const [discounts, setDiscounts] = useState({});
   const [packageDiscount, setPackageDiscount] = useState(0);
-  const [quotationNumber, setQuotationNumber] = useState("");
   const [quotationDate, setQuotationDate] = useState(new Date().toISOString().slice(0, 10));
   const [validUntil, setValidUntil] = useState("");
   const [notes, setNotes] = useState("");

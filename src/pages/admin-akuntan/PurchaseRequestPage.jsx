@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Eye, Plus, Send, Trash2 } from "lucide-react";
+
+import {
+  Eye,
+  Plus,
+  Send,
+  Trash2,
+  X,
+} from "lucide-react";
 
 import PurchaseRequestService from "../../services/PurchaseRequestService";
 import RequestSupplierService from "../../services/RequestSupplierService";
@@ -30,6 +37,10 @@ function PurchaseRequestPage() {
   const [selected, setSelected] = useState(null);
   const [supplierRows, setSupplierRows] = useState([]);
 
+  // Untuk modal quotation
+  const [selectedQuotation, setSelectedQuotation] =
+    useState(null);
+
   const [create, setCreate] = useState(false);
   const [send, setSend] = useState(false);
 
@@ -49,10 +60,7 @@ function PurchaseRequestPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // =========================================================
   // LOAD DATA
-  // =========================================================
-
   const load = async () => {
     try {
       const [r, s, i] = await Promise.all([
@@ -85,10 +93,7 @@ function PurchaseRequestPage() {
     load();
   }, []);
 
-  // =========================================================
   // SEARCH
-  // =========================================================
-
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
 
@@ -101,10 +106,7 @@ function PurchaseRequestPage() {
     );
   }, [requests, search]);
 
-  // =========================================================
   // CARI ITEM
-  // =========================================================
-
   const getItemById = (itemId) => {
     return items.find(
       (item) =>
@@ -149,6 +151,60 @@ function PurchaseRequestPage() {
   };
 
   // =========================================================
+  // FORMAT RUPIAH
+  // =========================================================
+
+  const formatRupiah = (value) => {
+    const number = Number(value || 0);
+
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      minimumFractionDigits: 0,
+    }).format(number);
+  };
+
+  // =========================================================
+  // FORMAT TANGGAL
+  // =========================================================
+
+  const formatDate = (value) => {
+    if (!value) {
+      return "-";
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      return value;
+    }
+
+    return date.toLocaleDateString("id-ID", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  };
+
+  // =========================================================
+  // AMBIL DETAIL QUOTATION
+  // =========================================================
+
+  const getQuotationDetails = (quotation) => {
+    if (!quotation) {
+      return [];
+    }
+
+    return (
+      quotation
+        .supplier_quotation_detail_supplier_quotation ||
+      quotation.supplierQuotationDetailSupplierQuotation ||
+      quotation.details ||
+      []
+    );
+  };
+
+  // =========================================================
   // BUKA DETAIL PURCHASE REQUEST
   // =========================================================
 
@@ -176,6 +232,7 @@ function PurchaseRequestPage() {
         Array.isArray(s) ? s : []
       );
 
+      setSelectedQuotation(null);
       setError("");
     } catch (e) {
       setError(
@@ -217,10 +274,8 @@ function PurchaseRequestPage() {
 
         details: rows.map((x) => ({
           item_id: x.item_id,
-
           quantity:
             Number(x.quantity),
-
           notes:
             x.notes || null,
         })),
@@ -278,11 +333,9 @@ function PurchaseRequestPage() {
       );
 
       setSend(false);
-
       setSupplierIds([]);
 
       await detail(selected);
-
       await load();
     } catch (e) {
       setError(
@@ -304,11 +357,8 @@ function PurchaseRequestPage() {
       <section className="space-y-5">
 
         {/* HEADER DETAIL */}
-
         <div className="flex items-center justify-between">
-
           <div>
-
             <p className="text-sm font-medium text-blue-600">
               Purchase Request
             </p>
@@ -316,21 +366,21 @@ function PurchaseRequestPage() {
             <h1 className="mt-1 text-2xl font-bold text-slate-900">
               {selected.request_number}
             </h1>
-
           </div>
 
           <button
             type="button"
-            onClick={() =>
-              setSelected(null)
-            }
+            onClick={() => {
+              setSelected(null);
+              setSelectedQuotation(null);
+            }}
             className="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50"
           >
             Kembali
           </button>
-
         </div>
 
+        {/* ERROR */}
         {error && (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
@@ -338,13 +388,10 @@ function PurchaseRequestPage() {
         )}
 
         {/* INFORMASI PR */}
-
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-
           <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
 
             <div>
-
               <p className="text-xs text-slate-500">
                 Tanggal
               </p>
@@ -352,47 +399,36 @@ function PurchaseRequestPage() {
               <p className="mt-1 text-sm">
                 {selected.request_date}
               </p>
-
             </div>
 
             <div>
-
               <p className="text-xs text-slate-500">
                 Status
               </p>
 
               <span className="mt-1 inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
-                {labels[
-                  selected.status
-                ] ||
+                {labels[selected.status] ||
                   selected.status}
               </span>
-
             </div>
 
             <div>
-
               <p className="text-xs text-slate-500">
                 Catatan
               </p>
 
               <p className="mt-1 text-sm">
-                {selected.notes ||
-                  "-"}
+                {selected.notes || "-"}
               </p>
-
             </div>
 
           </div>
-
         </div>
 
         {/* DETAIL BARANG */}
-
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
 
           <div className="mb-4 flex items-center justify-between">
-
             <h2 className="text-sm font-semibold">
               Detail Barang
             </h2>
@@ -410,17 +446,13 @@ function PurchaseRequestPage() {
                 Kirim ke Supplier
               </button>
             )}
-
           </div>
 
           <div className="overflow-x-auto">
-
             <table className="w-full min-w-[700px] text-left">
 
               <thead className="bg-slate-50">
-
                 <tr>
-
                   <th className="p-3 text-xs font-semibold uppercase text-slate-500">
                     No
                   </th>
@@ -440,13 +472,10 @@ function PurchaseRequestPage() {
                   <th className="p-3 text-xs font-semibold uppercase text-slate-500">
                     Catatan
                   </th>
-
                 </tr>
-
               </thead>
 
               <tbody>
-
                 {(
                   selected.purchase_request_detail_purchase_request ||
                   selected.detail_purchase_requests ||
@@ -458,10 +487,8 @@ function PurchaseRequestPage() {
                     d.detail_purchase_request_item;
 
                   const unit =
-                    item?.item_unit
-                      ?.unit_name ||
-                    item?.itemUnit
-                      ?.unit_name ||
+                    item?.item_unit?.unit_name ||
+                    item?.itemUnit?.unit_name ||
                     item?.unit_name ||
                     "-";
 
@@ -494,24 +521,19 @@ function PurchaseRequestPage() {
                       </td>
 
                       <td className="p-3 text-sm text-slate-600">
-                        {d.notes ||
-                          "-"}
+                        {d.notes || "-"}
                       </td>
 
                     </tr>
                   );
                 })}
-
               </tbody>
 
             </table>
-
           </div>
-
         </div>
 
         {/* SUPPLIER */}
-
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
 
           <h2 className="text-sm font-semibold">
@@ -519,11 +541,9 @@ function PurchaseRequestPage() {
           </h2>
 
           <div className="mt-4 overflow-x-auto">
-
-            <table className="w-full min-w-[650px] text-left">
+            <table className="w-full min-w-[750px] text-left">
 
               <thead className="bg-slate-50">
-
                 <tr>
 
                   <th className="p-3 text-xs font-semibold uppercase text-slate-500">
@@ -539,18 +559,22 @@ function PurchaseRequestPage() {
                   </th>
 
                   <th className="p-3 text-xs font-semibold uppercase text-slate-500">
-                    Quotation
+                    Quotation / Penawaran
                   </th>
 
                 </tr>
-
               </thead>
 
               <tbody>
 
-                {supplierRows.map(
-                  (r) => (
+                {supplierRows.map((r) => {
 
+                  const quotation =
+                    r.request_supplier_supplier_quotation ||
+                    r.requestSupplierSupplierQuotation ||
+                    null;
+
+                  return (
                     <tr
                       key={
                         r.request_supplier_id
@@ -558,6 +582,7 @@ function PurchaseRequestPage() {
                       className="border-t border-slate-100"
                     >
 
+                      {/* SUPPLIER */}
                       <td className="p-3 text-sm">
                         {r
                           .request_supplier_supplier
@@ -567,39 +592,397 @@ function PurchaseRequestPage() {
                           "-"}
                       </td>
 
+                      {/* STATUS */}
                       <td className="p-3 text-sm">
                         {r.status}
                       </td>
 
+                      {/* RESPON */}
                       <td className="p-3 text-sm">
                         {r.responded_at ||
                           "-"}
                       </td>
 
+                      {/* QUOTATION */}
                       <td className="p-3 text-sm">
-                        {r
-                          .request_supplier_supplier_quotation
-                          ?.quotation_number ||
-                          r
-                            .requestSupplierSupplierQuotation
-                            ?.quotation_number ||
-                          "-"}
+
+                        {quotation ? (
+                          <div className="flex items-center gap-3">
+
+                            <span className="text-sm font-medium text-slate-700">
+                              {quotation.quotation_number ||
+                                "-"}
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSelectedQuotation(
+                                  quotation
+                                )
+                              }
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-100"
+                            >
+                              <Eye size={14} />
+                              Lihat Penawaran
+                            </button>
+
+                          </div>
+                        ) : (
+                          "-"
+                        )}
+
                       </td>
 
                     </tr>
+                  );
+                })}
 
-                  )
+                {!supplierRows.length && (
+                  <tr>
+                    <td
+                      colSpan="4"
+                      className="p-8 text-center text-sm text-slate-400"
+                    >
+                      Belum ada supplier.
+                    </td>
+                  </tr>
                 )}
 
               </tbody>
 
             </table>
-
           </div>
-
         </div>
 
-        {/* MODAL KIRIM SUPPLIER */}
+        {/* =====================================================
+            MODAL LIHAT PENAWARAN
+        ===================================================== */}
+
+        {selectedQuotation && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+
+            <div className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-2xl bg-white shadow-xl">
+
+              {/* HEADER MODAL */}
+              <div className="flex items-center justify-between border-b border-slate-200 p-6">
+
+                <div>
+                  <p className="text-sm font-medium text-blue-600">
+                    Supplier Quotation
+                  </p>
+
+                  <h2 className="mt-1 text-xl font-bold text-slate-900">
+                    Detail Penawaran
+                  </h2>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSelectedQuotation(null)
+                  }
+                  className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                >
+                  <X size={20} />
+                </button>
+
+              </div>
+
+              {/* INFORMASI QUOTATION */}
+              <div className="p-6">
+
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-4">
+
+                  <div>
+                    <p className="text-xs text-slate-500">
+                      Nomor Quotation
+                    </p>
+
+                    <p className="mt-1 text-sm font-semibold text-slate-800">
+                      {selectedQuotation.quotation_number ||
+                        "-"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-slate-500">
+                      Tanggal Penawaran
+                    </p>
+
+                    <p className="mt-1 text-sm text-slate-800">
+                      {formatDate(
+                        selectedQuotation.quotation_date
+                      )}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-slate-500">
+                      Berlaku Sampai
+                    </p>
+
+                    <p className="mt-1 text-sm text-slate-800">
+                      {formatDate(
+                        selectedQuotation.valid_until
+                      )}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-slate-500">
+                      Status
+                    </p>
+
+                    <span className="mt-1 inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                      {selectedQuotation.status ||
+                        "-"}
+                    </span>
+                  </div>
+
+                </div>
+
+                {/* DETAIL BARANG QUOTATION */}
+                <div className="mt-6">
+
+                  <h3 className="mb-3 text-sm font-semibold text-slate-900">
+                    Detail Penawaran
+                  </h3>
+
+                  <div className="overflow-x-auto rounded-lg border border-slate-200">
+
+                    <table className="w-full min-w-[850px] text-left">
+
+                      <thead className="bg-slate-50">
+                        <tr>
+
+                          <th className="p-3 text-xs font-semibold uppercase text-slate-500">
+                            No
+                          </th>
+
+                          <th className="p-3 text-xs font-semibold uppercase text-slate-500">
+                            Barang
+                          </th>
+
+                          <th className="p-3 text-xs font-semibold uppercase text-slate-500">
+                            Qty
+                          </th>
+
+                          <th className="p-3 text-xs font-semibold uppercase text-slate-500">
+                            Satuan
+                          </th>
+
+                          <th className="p-3 text-right text-xs font-semibold uppercase text-slate-500">
+                            Harga Satuan
+                          </th>
+
+                          <th className="p-3 text-right text-xs font-semibold uppercase text-slate-500">
+                            Diskon
+                          </th>
+
+                          <th className="p-3 text-right text-xs font-semibold uppercase text-slate-500">
+                            Subtotal
+                          </th>
+
+                        </tr>
+                      </thead>
+
+                      <tbody>
+
+                        {getQuotationDetails(
+                          selectedQuotation
+                        ).map((detail, index) => {
+
+                          const purchaseDetail =
+                            detail
+                              .detail_supplier_quotation_purchase_request_detail ||
+                            detail
+                              .detailSupplierQuotationPurchaseRequestDetail ||
+                            null;
+
+                          const item =
+                            purchaseDetail?.detail_purchase_request_item ||
+                            purchaseDetail?.detailPurchaseRequestItem ||
+                            detail.item ||
+                            null;
+
+                          const quantity =
+                            purchaseDetail?.quantity ||
+                            detail.quantity ||
+                            0;
+
+                          const unit =
+                            item?.item_unit?.unit_name ||
+                            item?.itemUnit?.unit_name ||
+                            item?.unit_name ||
+                            "-";
+
+                          return (
+                            <tr
+                              key={
+                                detail.detail_supplier_quotation_id ||
+                                index
+                              }
+                              className="border-t border-slate-100"
+                            >
+
+                              <td className="p-3 text-sm text-slate-500">
+                                {index + 1}
+                              </td>
+
+                              <td className="p-3 text-sm font-medium text-slate-800">
+                                {item?.item_name ||
+                                  "-"}
+                              </td>
+
+                              <td className="p-3 text-sm text-slate-700">
+                                {quantity}
+                              </td>
+
+                              <td className="p-3 text-sm text-slate-600">
+                                {unit}
+                              </td>
+
+                              <td className="p-3 text-right text-sm text-slate-700">
+                                {formatRupiah(
+                                  detail.unit_price
+                                )}
+                              </td>
+
+                              <td className="p-3 text-right text-sm text-slate-700">
+                                {Number(
+                                  detail.discount_percentage ||
+                                    0
+                                )}%
+                              </td>
+
+                              <td className="p-3 text-right text-sm font-medium text-slate-800">
+                                {formatRupiah(
+                                  detail.subtotal
+                                )}
+                              </td>
+
+                            </tr>
+                          );
+                        })}
+
+                        {!getQuotationDetails(
+                          selectedQuotation
+                        ).length && (
+                          <tr>
+                            <td
+                              colSpan="7"
+                              className="p-8 text-center text-sm text-slate-400"
+                            >
+                              Detail penawaran belum tersedia.
+                            </td>
+                          </tr>
+                        )}
+
+                      </tbody>
+
+                    </table>
+
+                  </div>
+                </div>
+
+                {/* TOTAL QUOTATION */}
+                <div className="mt-6 flex justify-end">
+
+                  <div className="w-full max-w-sm space-y-3">
+
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">
+                        Subtotal
+                      </span>
+
+                      <span className="font-medium text-slate-800">
+                        {formatRupiah(
+                          selectedQuotation.subtotal
+                        )}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">
+                        Diskon
+                        {" "}
+                        (
+                        {Number(
+                          selectedQuotation.discount_total_percentage ||
+                            0
+                        )}
+                        %)
+                      </span>
+
+                      <span className="font-medium text-slate-800">
+                        {formatRupiah(
+                          selectedQuotation.discount_amount
+                        )}
+                      </span>
+                    </div>
+
+                    <div className="border-t border-slate-200 pt-3">
+
+                      <div className="flex justify-between">
+
+                        <span className="text-base font-semibold text-slate-900">
+                          Total
+                        </span>
+
+                        <span className="text-base font-bold text-blue-600">
+                          {formatRupiah(
+                            selectedQuotation.total
+                          )}
+                        </span>
+
+                      </div>
+
+                    </div>
+
+                  </div>
+
+                </div>
+
+                {/* CATATAN */}
+                <div className="mt-6">
+
+                  <p className="text-xs text-slate-500">
+                    Catatan Penawaran
+                  </p>
+
+                  <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                    {selectedQuotation.notes ||
+                      "-"}
+                  </div>
+
+                </div>
+
+              </div>
+
+              {/* FOOTER */}
+              <div className="flex justify-end border-t border-slate-200 p-6">
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSelectedQuotation(null)
+                  }
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50"
+                >
+                  Tutup
+                </button>
+
+              </div>
+
+            </div>
+
+          </div>
+        )}
+
+        {/* =====================================================
+            MODAL KIRIM SUPPLIER
+        ===================================================== */}
 
         {send && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -615,58 +998,54 @@ function PurchaseRequestPage() {
 
               <div className="mt-4 max-h-64 space-y-2 overflow-auto">
 
-                {suppliers.map(
-                  (s) => {
+                {suppliers.map((s) => {
 
-                    const supplierId =
-                      s.supplier_id ||
-                      s.id;
+                  const supplierId =
+                    s.supplier_id ||
+                    s.id;
 
-                    const supplierName =
-                      s.supplier_name ||
-                      s.nama ||
-                      "-";
+                  const supplierName =
+                    s.supplier_name ||
+                    s.nama ||
+                    "-";
 
-                    return (
-                      <label
-                        key={
+                  return (
+                    <label
+                      key={supplierId}
+                      className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 p-3 hover:bg-slate-50"
+                    >
+
+                      <input
+                        type="checkbox"
+                        checked={supplierIds.includes(
                           supplierId
+                        )}
+                        onChange={() =>
+                          setSupplierIds(
+                            (current) =>
+                              current.includes(
+                                supplierId
+                              )
+                                ? current.filter(
+                                    (id) =>
+                                      id !==
+                                      supplierId
+                                  )
+                                : [
+                                    ...current,
+                                    supplierId,
+                                  ]
+                          )
                         }
-                        className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 p-3 hover:bg-slate-50"
-                      >
+                      />
 
-                        <input
-                          type="checkbox"
-                          checked={supplierIds.includes(
-                            supplierId
-                          )}
-                          onChange={() =>
-                            setSupplierIds(
-                              (current) =>
-                                current.includes(
-                                  supplierId
-                                )
-                                  ? current.filter(
-                                      (id) =>
-                                        id !==
-                                        supplierId
-                                    )
-                                  : [
-                                      ...current,
-                                      supplierId,
-                                    ]
-                            )
-                          }
-                        />
+                      <span className="text-sm text-slate-700">
+                        {supplierName}
+                      </span>
 
-                        <span className="text-sm text-slate-700">
-                          {supplierName}
-                        </span>
-
-                      </label>
-                    );
-                  }
-                )}
+                    </label>
+                  );
+                })}
 
               </div>
 
@@ -711,7 +1090,6 @@ function PurchaseRequestPage() {
     <section>
 
       {/* HEADER */}
-
       <div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
 
         <div>
@@ -744,7 +1122,6 @@ function PurchaseRequestPage() {
       </div>
 
       {/* ERROR */}
-
       {error && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
@@ -752,7 +1129,6 @@ function PurchaseRequestPage() {
       )}
 
       {/* TABLE PURCHASE REQUEST */}
-
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
 
         <div className="border-b border-slate-200 p-4">
@@ -804,72 +1180,68 @@ function PurchaseRequestPage() {
 
             <tbody>
 
-              {filtered.map(
-                (r, i) => (
+              {filtered.map((r, i) => (
 
-                  <tr
-                    key={
-                      r.id ||
-                      r.purchase_request_id
-                    }
-                    className="border-t border-slate-100"
-                  >
+                <tr
+                  key={
+                    r.id ||
+                    r.purchase_request_id
+                  }
+                  className="border-t border-slate-100"
+                >
 
-                    <td className="p-4 text-sm text-slate-500">
-                      {i + 1}
-                    </td>
+                  <td className="p-4 text-sm text-slate-500">
+                    {i + 1}
+                  </td>
 
-                    <td className="p-4 text-sm font-semibold text-slate-800">
-                      {r.nomor ||
-                        r.request_number}
-                    </td>
+                  <td className="p-4 text-sm font-semibold text-slate-800">
+                    {r.nomor ||
+                      r.request_number}
+                  </td>
 
-                    <td className="p-4 text-sm text-slate-600">
-                      {r.tanggal ||
-                        r.request_date}
-                    </td>
+                  <td className="p-4 text-sm text-slate-600">
+                    {r.tanggal ||
+                      r.request_date}
+                  </td>
 
-                    <td className="p-4 text-sm">
+                  <td className="p-4 text-sm">
 
-                      <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
-                        {labels[
-                          r.status
-                        ] ||
-                          r.status}
-                      </span>
+                    <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                      {labels[
+                        r.status
+                      ] ||
+                        r.status}
+                    </span>
 
-                    </td>
+                  </td>
 
-                    <td className="p-4 text-center">
+                  <td className="p-4 text-center">
 
-                      <button
-                        type="button"
-                        onClick={() =>
-                          detail(r)
-                        }
-                        className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-100"
-                      >
-                        <Eye size={14} />
-                        Detail
-                      </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        detail(r)
+                      }
+                      className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-100"
+                    >
+                      <Eye size={14} />
+                      Detail
+                    </button>
 
-                    </td>
+                  </td>
 
-                  </tr>
+                </tr>
 
-                )
-              )}
+              ))}
 
               {!filtered.length && (
                 <tr>
-
                   <td
                     colSpan="5"
                     className="p-10 text-center text-sm text-slate-400"
                   >
                     Belum ada purchase request.
                   </td>
-
                 </tr>
               )}
 
@@ -881,9 +1253,9 @@ function PurchaseRequestPage() {
 
       </div>
 
-      {/* =========================================================
+      {/* =====================================================
           MODAL BUAT PURCHASE REQUEST
-      ========================================================= */}
+      ===================================================== */}
 
       {create && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -898,7 +1270,6 @@ function PurchaseRequestPage() {
             </h2>
 
             {/* TANGGAL + CATATAN */}
-
             <div className="mt-5 grid gap-4 md:grid-cols-2">
 
               <input
@@ -927,127 +1298,82 @@ function PurchaseRequestPage() {
             </div>
 
             {/* DETAIL BARANG */}
-
             <div className="mt-5 space-y-3">
 
-              {rows.map(
-                (r, i) => {
+              {rows.map((r, i) => {
 
-                  const unit =
-                    getItemUnit(
-                      r.item_id
-                    );
+                const unit =
+                  getItemUnit(
+                    r.item_id
+                  );
 
-                  return (
-                    <div
-                      key={i}
-                      className="grid gap-3 rounded-lg border border-slate-300 p-3 md:grid-cols-[1fr_150px_1fr_auto]"
+                return (
+                  <div
+                    key={i}
+                    className="grid gap-3 rounded-lg border border-slate-300 p-3 md:grid-cols-[1fr_150px_1fr_auto]"
+                  >
+
+                    {/* PILIH BARANG */}
+                    <select
+                      required
+                      value={r.item_id}
+                      onChange={(e) =>
+                        setRows(
+                          (current) =>
+                            current.map(
+                              (row, index) =>
+                                index === i
+                                  ? {
+                                      ...row,
+                                      item_id:
+                                        e.target.value,
+                                    }
+                                  : row
+                            )
+                        )
+                      }
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500"
                     >
 
-                      {/* PILIH BARANG */}
+                      <option value="">
+                        Pilih barang
+                      </option>
 
-                      <select
-                        required
-                        value={
-                          r.item_id
+                      {items.map(
+                        (item) => {
+
+                          const itemId =
+                            item.item_id ??
+                            item.id;
+
+                          const itemName =
+                            item.item_name ||
+                            item.nama ||
+                            item.nama_barang ||
+                            "-";
+
+                          return (
+                            <option
+                              key={itemId}
+                              value={itemId}
+                            >
+                              {itemName}
+                            </option>
+                          );
                         }
-                        onChange={(e) =>
-                          setRows(
-                            (current) =>
-                              current.map(
-                                (row, index) =>
-                                  index === i
-                                    ? {
-                                        ...row,
-                                        item_id:
-                                          e.target.value,
-                                      }
-                                    : row
-                              )
-                          )
-                        }
-                        className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500"
-                      >
+                      )}
 
-                        <option value="">
-                          Pilih barang
-                        </option>
+                    </select>
 
-                        {items.map(
-                          (item) => {
-
-                            const itemId =
-                              item.item_id ??
-                              item.id;
-
-                            const itemName =
-                              item.item_name ||
-                              item.nama ||
-                              item.nama_barang ||
-                              "-";
-
-                            return (
-                              <option
-                                key={
-                                  itemId
-                                }
-                                value={
-                                  itemId
-                                }
-                              >
-                                {itemName}
-                              </option>
-                            );
-                          }
-                        )}
-
-                      </select>
-
-                      {/* JUMLAH + SATUAN */}
-
-                      <div className="flex gap-2">
-
-                        <input
-                          required
-                          min="1"
-                          type="number"
-                          value={
-                            r.quantity
-                          }
-                          onChange={(e) =>
-                            setRows(
-                              (current) =>
-                                current.map(
-                                  (row, index) =>
-                                    index === i
-                                      ? {
-                                          ...row,
-                                          quantity:
-                                            e.target.value,
-                                        }
-                                      : row
-                                )
-                            )
-                          }
-                          className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
-                        />
-
-                        {/* SATUAN OTOMATIS */}
-
-                        <div
-                          className="flex min-w-[65px] items-center justify-center rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm font-medium text-slate-600"
-                          title="Satuan barang"
-                        >
-                          {unit}
-                        </div>
-
-                      </div>
-
-                      {/* CATATAN ITEM */}
+                    {/* JUMLAH + SATUAN */}
+                    <div className="flex gap-2">
 
                       <input
+                        required
+                        min="1"
+                        type="number"
                         value={
-                          r.notes
+                          r.quantity
                         }
                         onChange={(e) =>
                           setRows(
@@ -1057,55 +1383,82 @@ function PurchaseRequestPage() {
                                   index === i
                                     ? {
                                         ...row,
-                                        notes:
+                                        quantity:
                                           e.target.value,
                                       }
                                     : row
                               )
                           )
                         }
-                        placeholder="Catatan item"
-                        className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
+                        className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
                       />
 
-                      {/* HAPUS */}
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (
-                            rows.length >
-                            1
-                          ) {
-                            setRows(
-                              (current) =>
-                                current.filter(
-                                  (_, index) =>
-                                    index !==
-                                    i
-                                )
-                            );
-                          }
-                        }}
-                        disabled={
-                          rows.length ===
-                          1
-                        }
-                        className="inline-flex items-center justify-center gap-1 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+                      <div
+                        className="flex min-w-[65px] items-center justify-center rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm font-medium text-slate-600"
+                        title="Satuan barang"
                       >
-                        <Trash2 size={14} />
-                        Hapus
-                      </button>
+                        {unit}
+                      </div>
 
                     </div>
-                  );
-                }
-              )}
+
+                    {/* CATATAN ITEM */}
+                    <input
+                      value={r.notes}
+                      onChange={(e) =>
+                        setRows(
+                          (current) =>
+                            current.map(
+                              (row, index) =>
+                                index === i
+                                  ? {
+                                      ...row,
+                                      notes:
+                                        e.target.value,
+                                    }
+                                  : row
+                            )
+                        )
+                      }
+                      placeholder="Catatan item"
+                      className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
+                    />
+
+                    {/* HAPUS */}
+                    <button
+                      type="button"
+                      onClick={() => {
+
+                        if (
+                          rows.length >
+                          1
+                        ) {
+                          setRows(
+                            (current) =>
+                              current.filter(
+                                (_, index) =>
+                                  index !== i
+                              )
+                          );
+                        }
+
+                      }}
+                      disabled={
+                        rows.length === 1
+                      }
+                      className="inline-flex items-center justify-center gap-1 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <Trash2 size={14} />
+                      Hapus
+                    </button>
+
+                  </div>
+                );
+              })}
 
             </div>
 
             {/* TAMBAH BARIS */}
-
             <button
               type="button"
               onClick={() =>
@@ -1122,17 +1475,20 @@ function PurchaseRequestPage() {
             </button>
 
             {/* BUTTON */}
-
             <div className="mt-6 flex justify-end gap-2">
 
               <button
                 type="button"
                 onClick={() => {
+
                   setCreate(false);
+
                   setRows([
                     { ...empty },
                   ]);
+
                   setNotes("");
+
                 }}
                 className="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50"
               >
