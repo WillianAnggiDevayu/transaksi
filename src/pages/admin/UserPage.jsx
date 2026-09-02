@@ -377,9 +377,9 @@ function UserPage({ currentUser }) {
                 <option value="akuntan">
                   Akuntan
                 </option>
-                <option value="supplier">
+                {/* <option value="supplier">
                   Supplier
-                </option>
+                </option> */}
               </select>
 
               <input

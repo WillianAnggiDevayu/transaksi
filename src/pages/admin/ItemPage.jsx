@@ -237,9 +237,7 @@ function ItemPage() {
                   No
                 </th>
 
-                <th className="px-5 py-3 text-xs font-semibold uppercase text-slate-500">
-                  Kode
-                </th>
+
 
                 <th className="px-5 py-3 text-xs font-semibold uppercase text-slate-500">
                   Nama Item
@@ -251,6 +249,10 @@ function ItemPage() {
 
                 <th className="px-5 py-3 text-xs font-semibold uppercase text-slate-500">
                   Satuan
+                </th>
+
+                <th className="px-5 py-3 text-xs font-semibold uppercase text-slate-500">
+                  Kode
                 </th>
 
                 <th className="px-5 py-3 text-center text-xs font-semibold uppercase text-slate-500">
@@ -288,10 +290,6 @@ function ItemPage() {
                       {index + 1}
                     </td>
 
-                    <td className="px-5 py-4 text-sm text-slate-600">
-                      {item.display_code}
-                    </td>
-
                     <td className="px-5 py-4 text-sm font-medium text-slate-800">
                       {item.item_name}
                     </td>
@@ -302,6 +300,10 @@ function ItemPage() {
 
                     <td className="px-5 py-4 text-sm text-slate-600">
                       {item.display_unit}
+                    </td>
+
+                    <td className="px-5 py-4 text-sm text-slate-600">
+                      {item.display_code}
                     </td>
 
                     <td className="px-5 py-4">

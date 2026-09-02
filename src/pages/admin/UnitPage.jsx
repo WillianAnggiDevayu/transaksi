@@ -271,7 +271,7 @@ function UnitPage() {
 
               <input
                 required
-                maxLength={5}
+                maxLength={3}
                 placeholder="Kode unit"
                 value={form.unit_code}
                 onChange={(e) =>

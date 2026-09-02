@@ -29,7 +29,7 @@ function SupplierPanel({ user, onLogout }) {
 
         <nav className="flex-1 space-y-1 p-3">
           <NavButton active={menu === "dashboard"} onClick={() => setMenu("dashboard")} icon={<LayoutDashboard size={18} />}>Dashboard</NavButton>
-          <NavButton active={menu === "requestOrder"} onClick={() => setMenu("requestOrder")} icon={<FileText size={18} />}>Request Order</NavButton>
+          <NavButton active={menu === "requestOrder"} onClick={() => setMenu("requestOrder")} icon={<FileText size={18} />}>Penawaran</NavButton>
           <NavButton active={menu === "purchaseOrder"} onClick={() => setMenu("purchaseOrder")} icon={<ShoppingCart size={18} />}>Purchase Order</NavButton>
         </nav>
 
