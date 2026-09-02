@@ -15,12 +15,33 @@ class SupplierService {
   }
 
   async getAll() {
-    const response = await ApiClient.get("/suppliers");
-    const data = response?.data || response;
+    if (CacheStore.has(CACHE_KEY)) {
+      return CacheStore.get(CACHE_KEY);
+    }
 
-    return Array.isArray(data)
-      ? data.map((item) => this.normalize(item))
-      : [];
+    let rawSuppliers = [];
+
+    try {
+      const response = await ApiClient.get("/suppliers");
+      const data = response?.data || response;
+
+      rawSuppliers = Array.isArray(data) ? data : [];
+    } catch (err) {
+      console.warn("Gagal memuat suppliers:", err.message);
+    }
+
+    const suppliers = rawSuppliers.map((item) => this.normalize(item));
+
+    const result = OfflineQueue.mergeOptimistic(
+      "suppliers",
+      "supplier_id",
+      suppliers,
+      (raw) => this.normalize(raw)
+    );
+
+    CacheStore.set(CACHE_KEY, result);
+
+    return result;
   }
 
   async getById(id) {

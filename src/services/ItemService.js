@@ -17,12 +17,33 @@ class ItemService {
   }
 
   async getAll() {
-    const response = await ApiClient.get("/items");
-    const data = response?.data || response;
+    if (CacheStore.has(CACHE_KEY)) {
+      return CacheStore.get(CACHE_KEY);
+    }
 
-    return Array.isArray(data)
-      ? data.map((item) => this.normalize(item))
-      : [];
+    let rawItems = [];
+
+    try {
+      const response = await ApiClient.get("/items");
+      const data = response?.data || response;
+
+      rawItems = Array.isArray(data) ? data : [];
+    } catch (err) {
+      console.warn("Gagal memuat items:", err.message);
+    }
+
+    const items = rawItems.map((item) => this.normalize(item));
+
+    const result = OfflineQueue.mergeOptimistic(
+      "items",
+      "item_id",
+      items,
+      (raw) => this.normalize(raw)
+    );
+
+    CacheStore.set(CACHE_KEY, result);
+
+    return result;
   }
 
   async getById(id) {

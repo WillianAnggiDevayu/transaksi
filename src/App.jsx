@@ -9,29 +9,24 @@ import SupplierPanel from "./pages/supplier/SupplierPanel";
 function App() {
   const [user, setUser] = useState(() => AuthService.getUser());
 
+  const handleLogout = async () => {
+    try { await AuthService.logout(); } finally { setUser(null); }
+  };
+
   if (!user) {
     return <Login onLogin={setUser} />;
   }
 
   if (user.role === "admin") {
-    return <AdminPanel user={user} onLogout={async () => {
-      await AuthService.logout();
-      setUser(null);
-    }} />;
+    return <AdminPanel user={user} onLogout={handleLogout} />;
   }
 
-  if (user?.role === "admin" || user?.role === "akuntan") {
-    return <AdminAkuntanPanel user={user} onLogout={async () => {
-      await AuthService.logout();
-      setUser(null);
-    }} />;
+  if (user.role === "akuntan") {
+    return <AdminAkuntanPanel user={user} onLogout={handleLogout} />;
   }
 
-  if (user?.role === "supplier") {
-    return <SupplierPanel user={user} onLogout={async () => {
-      await AuthService.logout();
-      setUser(null);
-    }} />;
+  if (user.role === "supplier") {
+    return <SupplierPanel user={user} onLogout={handleLogout} />;
   }
 
   return (
@@ -43,10 +38,7 @@ function App() {
         </p>
         <button
           type="button"
-          onClick={async () => {
-            await AuthService.logout();
-            setUser(null);
-          }}
+          onClick={handleLogout}
           className="mt-6 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
         >
           Logout

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Pencil, Plus, Search, Trash2 } from "lucide-react";
+import useCachedList from "../../hooks/useCachedList";
 import UserService from "../../services/UserService";
 
 const emptyForm = {
@@ -11,7 +12,14 @@ const emptyForm = {
 };
 
 function UserPage({ currentUser }) {
-  const [users, setUsers] = useState([]);
+  const {
+    data: usersData,
+    loading,
+  } = useCachedList("users", UserService);
+
+  // Pastikan data selalu berupa array.
+  const users = Array.isArray(usersData) ? usersData : [];
+
   const [search, setSearch] = useState("");
   const [form, setForm] = useState(emptyForm);
   const [editing, setEditing] = useState(null);
@@ -19,21 +27,9 @@ function UserPage({ currentUser }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const load = async () => {
-    try {
-      const data = await UserService.getAll();
-      setUsers(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setError(err.message || "Gagal memuat user.");
-    }
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
-
   const filtered = useMemo(() => {
     const keyword = search.toLowerCase().trim();
+
     return users.filter((user) =>
       `${user.name || ""} ${user.email || ""} ${user.role || ""}`
         .toLowerCase()
@@ -50,6 +46,7 @@ function UserPage({ currentUser }) {
 
   const openEdit = (user) => {
     setEditing(user);
+
     setForm({
       name: user.name || "",
       email: user.email || "",
@@ -57,12 +54,21 @@ function UserPage({ currentUser }) {
       password_confirmation: "",
       role: user.role || "akuntan",
     });
+
     setError("");
     setOpen(true);
   };
 
+  const closeModal = () => {
+    setOpen(false);
+    setEditing(null);
+    setForm(emptyForm);
+    setError("");
+  };
+
   const submit = async (e) => {
     e.preventDefault();
+
     setSaving(true);
     setError("");
 
@@ -76,25 +82,41 @@ function UserPage({ currentUser }) {
 
         if (form.password) {
           payload.password = form.password;
-          payload.password_confirmation = form.password_confirmation;
+          payload.password_confirmation =
+            form.password_confirmation;
         }
 
-        // Backend mencegah admin mengubah role akun dirinya sendiri.
-        await UserService.update(editing.id, payload);
+        await UserService.update(
+          editing.id,
+          payload
+        );
       } else {
         await UserService.create({
           name: form.name.trim(),
           email: form.email.trim(),
           password: form.password,
-          password_confirmation: form.password_confirmation,
+          password_confirmation:
+            form.password_confirmation,
           role: form.role,
         });
       }
 
-      setOpen(false);
-      await load();
+      /*
+       * Tidak perlu memanggil load().
+       *
+       * UserService mutation akan melakukan
+       * CacheStore.clear("users").
+       *
+       * useCachedList akan menangani invalidasi
+       * dan mengambil data terbaru.
+       */
+      closeModal();
     } catch (err) {
-      setError(err?.data?.message || err.message || "Gagal menyimpan user.");
+      setError(
+        err?.data?.message ||
+        err?.message ||
+        "Gagal menyimpan user."
+      );
     } finally {
       setSaving(false);
     }
@@ -102,17 +124,35 @@ function UserPage({ currentUser }) {
 
   const remove = async (user) => {
     if (user.id === currentUser?.id) {
-      setError("Anda tidak dapat menghapus akun sendiri.");
+      setError(
+        "Anda tidak dapat menghapus akun sendiri."
+      );
       return;
     }
 
-    if (!window.confirm(`Hapus user "${user.name}"?`)) return;
+    if (
+      !window.confirm(
+        `Hapus user "${user.name}"?`
+      )
+    ) {
+      return;
+    }
+
+    setError("");
 
     try {
       await UserService.delete(user.id);
-      await load();
+
+      /*
+       * Tidak perlu load().
+       * Cache akan di-refresh oleh useCachedList.
+       */
     } catch (err) {
-      setError(err?.data?.message || err.message || "Gagal menghapus user.");
+      setError(
+        err?.data?.message ||
+        err?.message ||
+        "Gagal menghapus user."
+      );
     }
   };
 
@@ -120,8 +160,14 @@ function UserPage({ currentUser }) {
     <section>
       <div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <p className="text-sm font-medium text-blue-600">Master Data</p>
-          <h1 className="mt-1 text-2xl font-bold text-slate-900">User</h1>
+          <p className="text-sm font-medium text-blue-600">
+            Master Data
+          </p>
+
+          <h1 className="mt-1 text-2xl font-bold text-slate-900">
+            User
+          </h1>
+
           <p className="mt-1 text-sm text-slate-500">
             Kelola akun admin, akuntan, dan supplier.
           </p>
@@ -146,10 +192,16 @@ function UserPage({ currentUser }) {
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 p-4">
           <div className="relative max-w-md">
-            <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search
+              size={17}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+
             <input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) =>
+                setSearch(e.target.value)
+              }
               placeholder="Cari user..."
               className="w-full rounded-lg border border-slate-300 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-blue-500"
             />
@@ -160,48 +212,101 @@ function UserPage({ currentUser }) {
           <table className="w-full min-w-[700px] text-left">
             <thead className="bg-slate-50">
               <tr>
-                <th className="px-5 py-3 text-xs font-semibold uppercase text-slate-500">No</th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase text-slate-500">Nama</th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase text-slate-500">Email</th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase text-slate-500">Role</th>
-                <th className="px-5 py-3 text-center text-xs font-semibold uppercase text-slate-500">Aksi</th>
+                <th className="px-5 py-3 text-xs font-semibold uppercase text-slate-500">
+                  No
+                </th>
+
+                <th className="px-5 py-3 text-xs font-semibold uppercase text-slate-500">
+                  Nama
+                </th>
+
+                <th className="px-5 py-3 text-xs font-semibold uppercase text-slate-500">
+                  Email
+                </th>
+
+                <th className="px-5 py-3 text-xs font-semibold uppercase text-slate-500">
+                  Role
+                </th>
+
+                <th className="px-5 py-3 text-center text-xs font-semibold uppercase text-slate-500">
+                  Aksi
+                </th>
               </tr>
             </thead>
+
             <tbody>
-              {filtered.length === 0 ? (
+              {loading ? (
                 <tr>
-                  <td colSpan="5" className="px-5 py-10 text-center text-sm text-slate-500">
+                  <td
+                    colSpan="5"
+                    className="px-5 py-10 text-center text-sm text-slate-500"
+                  >
+                    Memuat data...
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan="5"
+                    className="px-5 py-10 text-center text-sm text-slate-500"
+                  >
                     Tidak ada user.
                   </td>
                 </tr>
               ) : (
                 filtered.map((user, index) => (
-                  <tr key={user.id} className="border-t border-slate-100">
-                    <td className="px-5 py-4 text-sm text-slate-500">{index + 1}</td>
+                  <tr
+                    key={user.id}
+                    className="border-t border-slate-100"
+                  >
+                    <td className="px-5 py-4 text-sm text-slate-500">
+                      {index + 1}
+                    </td>
+
                     <td className="px-5 py-4 text-sm font-medium text-slate-800">
                       {user.name}
+
                       {user.id === currentUser?.id && (
                         <span className="ml-2 rounded-full bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-600">
                           Anda
                         </span>
                       )}
                     </td>
-                    <td className="px-5 py-4 text-sm text-slate-600">{user.email}</td>
+
+                    <td className="px-5 py-4 text-sm text-slate-600">
+                      {user.email}
+                    </td>
+
                     <td className="px-5 py-4">
                       <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold capitalize text-slate-600">
                         {user.role}
                       </span>
                     </td>
+
                     <td className="px-5 py-4">
                       <div className="flex justify-center gap-2">
-                        <button type="button" onClick={() => openEdit(user)} className="rounded-lg bg-amber-50 p-2 text-amber-600 hover:bg-amber-100">
-                          <Pencil size={16} />
-                        </button>
                         <button
                           type="button"
-                          disabled={user.id === currentUser?.id}
-                          onClick={() => remove(user)}
+                          onClick={() =>
+                            openEdit(user)
+                          }
+                          className="rounded-lg bg-amber-50 p-2 text-amber-600 hover:bg-amber-100"
+                          title="Edit"
+                        >
+                          <Pencil size={16} />
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={
+                            user.id ===
+                            currentUser?.id
+                          }
+                          onClick={() =>
+                            remove(user)
+                          }
                           className="rounded-lg bg-red-50 p-2 text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-30"
+                          title="Hapus"
                         >
                           <Trash2 size={16} />
                         </button>
@@ -217,9 +322,14 @@ function UserPage({ currentUser }) {
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
-          <form onSubmit={submit} className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+          <form
+            onSubmit={submit}
+            className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl"
+          >
             <h2 className="text-lg font-bold text-slate-900">
-              {editing ? "Edit User" : "Tambah User"}
+              {editing
+                ? "Edit User"
+                : "Tambah User"}
             </h2>
 
             <div className="mt-5 space-y-4">
@@ -227,7 +337,12 @@ function UserPage({ currentUser }) {
                 required
                 placeholder="Nama"
                 value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    name: e.target.value,
+                  })
+                }
                 className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
               />
 
@@ -236,54 +351,101 @@ function UserPage({ currentUser }) {
                 type="email"
                 placeholder="Email"
                 value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    email: e.target.value,
+                  })
+                }
                 className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
               />
 
               <select
                 required
                 value={form.role}
-                onChange={(e) => setForm({ ...form, role: e.target.value })}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    role: e.target.value,
+                  })
+                }
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
               >
-                <option value="admin">Admin</option>
-                <option value="akuntan">Akuntan</option>
-                <option value="supplier">Supplier</option>
+                <option value="admin">
+                  Admin
+                </option>
+                <option value="akuntan">
+                  Akuntan
+                </option>
+                <option value="supplier">
+                  Supplier
+                </option>
               </select>
 
               <input
                 required={!editing}
                 type="password"
-                placeholder={editing ? "Password baru (opsional)" : "Password"}
+                placeholder={
+                  editing
+                    ? "Password baru (opsional)"
+                    : "Password"
+                }
                 value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    password: e.target.value,
+                  })
+                }
                 className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
               />
 
               <input
-                required={!editing || Boolean(form.password)}
+                required={
+                  !editing ||
+                  Boolean(form.password)
+                }
                 type="password"
                 placeholder="Konfirmasi password"
-                value={form.password_confirmation}
+                value={
+                  form.password_confirmation
+                }
                 onChange={(e) =>
-                  setForm({ ...form, password_confirmation: e.target.value })
+                  setForm({
+                    ...form,
+                    password_confirmation:
+                      e.target.value,
+                  })
                 }
                 className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
               />
             </div>
 
-            {editing && editing.id === currentUser?.id && (
-              <p className="mt-4 text-xs text-amber-600">
-                Role akun sendiri tidak dapat diubah oleh backend.
-              </p>
-            )}
+            {editing &&
+              editing.id === currentUser?.id && (
+                <p className="mt-4 text-xs text-amber-600">
+                  Role akun sendiri tidak dapat
+                  diubah oleh backend.
+                </p>
+              )}
 
             <div className="mt-6 flex justify-end gap-2">
-              <button type="button" onClick={() => setOpen(false)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">
+              <button
+                type="button"
+                onClick={closeModal}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm"
+              >
                 Batal
               </button>
-              <button disabled={saving} type="submit" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
-                {saving ? "Menyimpan..." : "Simpan"}
+
+              <button
+                disabled={saving}
+                type="submit"
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {saving
+                  ? "Menyimpan..."
+                  : "Simpan"}
               </button>
             </div>
           </form>

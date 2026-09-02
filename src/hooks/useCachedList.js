@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import CacheStore from "../services/CacheStore";
 
 export default function useCachedList(
@@ -6,58 +6,102 @@ export default function useCachedList(
     service,
     methodName = "getAll"
 ) {
-    const cachedData = CacheStore.get(cacheKey);
+    const [data, setData] = useState(() => {
+        const cached = CacheStore.get(cacheKey);
+        return Array.isArray(cached) ? cached : [];
+    });
 
-    const [data, setData] = useState(cachedData || []);
-    const [loading, setLoading] = useState(!CacheStore.has(cacheKey));
+    const [loading, setLoading] = useState(
+        () => !CacheStore.has(cacheKey)
+    );
+
+    const fetchData = useCallback(async () => {
+        setLoading(true);
+
+        try {
+            const result = await service[methodName]();
+
+            // Pastikan data yang masuk ke cache selalu array.
+            const normalizedData = Array.isArray(result)
+                ? result
+                : [];
+
+            CacheStore.set(cacheKey, normalizedData);
+
+            return normalizedData;
+        } catch (error) {
+            console.error(
+                `Gagal memuat data untuk cache "${cacheKey}":`,
+                error
+            );
+
+            setData([]);
+            setLoading(false);
+
+            return [];
+        }
+    }, [cacheKey, service, methodName]);
 
     useEffect(() => {
         let mounted = true;
 
+        const handleCacheUpdate = (value) => {
+            if (!mounted) return;
+
+            /*
+             * undefined berarti cache di-clear/invalidate.
+             * Ambil ulang data dari API.
+             */
+            if (value === undefined) {
+                fetchData();
+                return;
+            }
+
+            /*
+             * Cache harus selalu berupa array.
+             */
+            const normalizedData = Array.isArray(value)
+                ? value
+                : [];
+
+            setData(normalizedData);
+            setLoading(false);
+        };
+
         const unsubscribe = CacheStore.subscribe(
             cacheKey,
-            (value) => {
-                if (!mounted) return;
-
-                setData(value || []);
-                setLoading(false);
-            }
+            handleCacheUpdate
         );
 
-        // Cache sudah ada, tidak perlu request ulang.
+        /*
+         * Gunakan cache jika tersedia.
+         */
         if (CacheStore.has(cacheKey)) {
-            setLoading(false);
-            return () => {
-                mounted = false;
-                unsubscribe();
-            };
+            const cached = CacheStore.get(cacheKey);
+
+            if (Array.isArray(cached)) {
+                setData(cached);
+                setLoading(false);
+            } else {
+                /*
+                 * Cache ada tetapi formatnya tidak valid.
+                 * Bersihkan lalu ambil ulang dari API.
+                 */
+                CacheStore.clear(cacheKey);
+            }
+        } else {
+            /*
+             * Cache belum tersedia.
+             * Ambil data dari API.
+             */
+            fetchData();
         }
-
-        setLoading(true);
-
-        service[methodName]()
-            .then((result) => {
-                if (!mounted) return;
-
-                CacheStore.set(cacheKey, result || []);
-            })
-            .catch((error) => {
-                console.error(
-                    `Gagal memuat data untuk cache "${cacheKey}":`,
-                    error
-                );
-
-                if (mounted) {
-                    setData([]);
-                    setLoading(false);
-                }
-            });
 
         return () => {
             mounted = false;
             unsubscribe();
         };
-    }, [cacheKey, service, methodName]);
+    }, [cacheKey, fetchData]);
 
     return {
         data,

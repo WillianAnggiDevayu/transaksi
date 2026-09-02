@@ -1,77 +1,129 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Pencil, Plus, Search, Trash2 } from "lucide-react";
 import ItemService from "../../services/ItemService";
 import UnitService from "../../services/UnitService";
-
-const emptyForm = {
-  item_name: "",
-  stock: 0,
-  unit_id: "",
-};
+import useCachedList from "../../hooks/useCachedList";
 
 function ItemPage() {
-  const [items, setItems] = useState([]);
-  const [units, setUnits] = useState([]);
+  const {
+    data: itemsData,
+    loading: itemsLoading,
+  } = useCachedList("items", ItemService);
+
+  const {
+    data: unitsData,
+    loading: unitsLoading,
+  } = useCachedList("units", UnitService);
+
+  const items = Array.isArray(itemsData) ? itemsData : [];
+  const units = Array.isArray(unitsData) ? unitsData : [];
+
   const [search, setSearch] = useState("");
-  const [form, setForm] = useState(emptyForm);
-  const [editing, setEditing] = useState(null);
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const [itemsData, unitsData] = await Promise.all([
-        ItemService.getAll(),
-        UnitService.getAll(),
-      ]);
-      setItems(Array.isArray(itemsData) ? itemsData : []);
-      setUnits(Array.isArray(unitsData) ? unitsData : []);
-    } catch (err) {
-      setError(err.message || "Gagal memuat data.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [form, setForm] = useState({
+    item_name: "",
+    stock: "",
+    unit_id: "",
+  });
 
-  useEffect(() => {
-    load();
-  }, []);
+  const loading = itemsLoading || unitsLoading;
 
-  const filtered = useMemo(() => {
+  /*
+   * Buat lookup unit berdasarkan unit_id.
+   *
+   * Contoh:
+   * unit_id 1 -> "Kilogram"
+   * unit_id 2 -> "Liter"
+   */
+  const unitMap = useMemo(() => {
+    const map = new Map();
+
+    units.forEach((unit) => {
+      map.set(String(unit.unit_id), unit);
+    });
+
+    return map;
+  }, [units]);
+
+  /*
+   * Normalisasi item untuk kebutuhan tampilan.
+   *
+   * ItemService menyediakan unit_id, sedangkan nama satuan
+   * diambil dari cache units.
+   */
+  const displayItems = useMemo(() => {
+    return items.map((item) => {
+      const unit = unitMap.get(String(item.unit_id));
+
+      return {
+        ...item,
+        display_code: unit?.unit_code || "-",
+        display_unit: unit?.unit_name || "-",
+      };
+    });
+  }, [items, unitMap]);
+
+  const filteredItems = useMemo(() => {
     const keyword = search.toLowerCase().trim();
 
-    return items.filter((item) => {
-      const unit = units.find((unit) => unit.unit_id === item.unit_id);
+    if (!keyword) {
+      return displayItems;
+    }
 
-      return `${item.item_name || ""} ${unit?.unit_code || ""}`
+    return displayItems.filter((item) =>
+      `${item.item_name || ""} ${item.display_code || ""} ${item.display_unit || ""
+        }`
         .toLowerCase()
-        .includes(keyword);
-    });
-  }, [items, units, search]);
+        .includes(keyword)
+    );
+  }, [displayItems, search]);
 
   const openCreate = () => {
-    setEditing(null);
-    setForm(emptyForm);
+    setEditingItem(null);
+
+    setForm({
+      item_name: "",
+      stock: "",
+      unit_id: "",
+    });
+
     setError("");
-    setOpen(true);
+    setShowModal(true);
   };
 
   const openEdit = (item) => {
-    setEditing(item);
+    setEditingItem(item);
+
     setForm({
       item_name: item.item_name || "",
-      stock: item.stock ?? 0,
+      stock: item.stock ?? "",
       unit_id: item.unit_id || "",
     });
+
     setError("");
-    setOpen(true);
+    setShowModal(true);
   };
 
-  const submit = async (event) => {
-    event.preventDefault();
+  const closeModal = () => {
+    setShowModal(false);
+    setEditingItem(null);
+
+    setForm({
+      item_name: "",
+      stock: "",
+      unit_id: "",
+    });
+
+    setError("");
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
     setSaving(true);
     setError("");
 
@@ -82,33 +134,46 @@ function ItemPage() {
         unit_id: form.unit_id,
       };
 
-      if (editing) {
-        // Backend UpdateItemRequest hanya menerima item_name dan unit_id.
-        await ItemService.update(editing.item_id, {
-          item_name: payload.item_name,
-          unit_id: payload.unit_id,
-        });
+      if (editingItem) {
+        await ItemService.update(
+          editingItem.item_id,
+          payload
+        );
       } else {
         await ItemService.create(payload);
       }
 
-      setOpen(false);
-      await load();
+      closeModal();
     } catch (err) {
-      setError(err?.data?.message || err.message || "Gagal menyimpan barang.");
+      setError(
+        err?.data?.message ||
+        err?.message ||
+        "Gagal menyimpan item."
+      );
     } finally {
       setSaving(false);
     }
   };
 
-  const remove = async (item) => {
-    if (!window.confirm(`Hapus barang "${item.item_name}"?`)) return;
+  const handleDelete = async (item) => {
+    if (
+      !window.confirm(
+        `Hapus item "${item.item_name}"?`
+      )
+    ) {
+      return;
+    }
+
+    setError("");
 
     try {
       await ItemService.delete(item.item_id);
-      await load();
     } catch (err) {
-      setError(err?.data?.message || err.message || "Gagal menghapus barang.");
+      setError(
+        err?.data?.message ||
+        err?.message ||
+        "Gagal menghapus item."
+      );
     }
   };
 
@@ -116,10 +181,16 @@ function ItemPage() {
     <section>
       <div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <p className="text-sm font-medium text-blue-600">Master Data</p>
-          <h1 className="mt-1 text-2xl font-bold text-slate-900">Barang</h1>
+          <p className="text-sm font-medium text-blue-600">
+            Master Data
+          </p>
+
+          <h1 className="mt-1 text-2xl font-bold text-slate-900">
+            Item
+          </h1>
+
           <p className="mt-1 text-sm text-slate-500">
-            Kelola barang dan unit yang digunakan sistem.
+            Kelola data item dan satuan barang.
           </p>
         </div>
 
@@ -129,7 +200,7 @@ function ItemPage() {
           className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
         >
           <Plus size={17} />
-          Tambah Barang
+          Tambah Item
         </button>
       </div>
 
@@ -146,64 +217,111 @@ function ItemPage() {
               size={17}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
             />
+
             <input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Cari barang..."
+              onChange={(e) =>
+                setSearch(e.target.value)
+              }
+              placeholder="Cari item..."
               className="w-full rounded-lg border border-slate-300 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             />
           </div>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[650px] text-left">
+          <table className="w-full min-w-[750px] text-left">
             <thead className="bg-slate-50">
               <tr>
-                <th className="px-5 py-3 text-xs font-semibold uppercase text-slate-500">No</th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase text-slate-500">Barang</th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase text-slate-500">Unit</th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase text-slate-500">Stok</th>
-                <th className="px-5 py-3 text-center text-xs font-semibold uppercase text-slate-500">Aksi</th>
+                <th className="px-5 py-3 text-xs font-semibold uppercase text-slate-500">
+                  No
+                </th>
+
+                <th className="px-5 py-3 text-xs font-semibold uppercase text-slate-500">
+                  Kode
+                </th>
+
+                <th className="px-5 py-3 text-xs font-semibold uppercase text-slate-500">
+                  Nama Item
+                </th>
+
+                <th className="px-5 py-3 text-xs font-semibold uppercase text-slate-500">
+                  Stok
+                </th>
+
+                <th className="px-5 py-3 text-xs font-semibold uppercase text-slate-500">
+                  Satuan
+                </th>
+
+                <th className="px-5 py-3 text-center text-xs font-semibold uppercase text-slate-500">
+                  Aksi
+                </th>
               </tr>
             </thead>
 
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="5" className="px-5 py-10 text-center text-sm text-slate-500">
+                  <td
+                    colSpan="6"
+                    className="px-5 py-10 text-center text-sm text-slate-500"
+                  >
                     Memuat data...
                   </td>
                 </tr>
-              ) : filtered.length === 0 ? (
+              ) : filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="px-5 py-10 text-center text-sm text-slate-500">
-                    Tidak ada barang.
+                  <td
+                    colSpan="6"
+                    className="px-5 py-10 text-center text-sm text-slate-500"
+                  >
+                    Tidak ada item.
                   </td>
                 </tr>
               ) : (
-                filtered.map((item, index) => (
-                  <tr key={item.item_id} className="border-t border-slate-100">
-                    <td className="px-5 py-4 text-sm text-slate-500">{index + 1}</td>
+                filteredItems.map((item, index) => (
+                  <tr
+                    key={item.item_id}
+                    className="border-t border-slate-100"
+                  >
+                    <td className="px-5 py-4 text-sm text-slate-500">
+                      {index + 1}
+                    </td>
+
+                    <td className="px-5 py-4 text-sm text-slate-600">
+                      {item.display_code}
+                    </td>
+
                     <td className="px-5 py-4 text-sm font-medium text-slate-800">
                       {item.item_name}
                     </td>
+
                     <td className="px-5 py-4 text-sm text-slate-600">
-                      {units.find((unit) => unit.unit_id === item.unit_id)?.unit_code || "-"}
+                      {item.stock ?? 0}
                     </td>
-                    <td className="px-5 py-4 text-sm text-slate-600">{item.stock}</td>
+
+                    <td className="px-5 py-4 text-sm text-slate-600">
+                      {item.display_unit}
+                    </td>
+
                     <td className="px-5 py-4">
                       <div className="flex justify-center gap-2">
                         <button
                           type="button"
-                          onClick={() => openEdit(item)}
+                          onClick={() =>
+                            openEdit(item)
+                          }
                           className="rounded-lg bg-amber-50 p-2 text-amber-600 hover:bg-amber-100"
                           title="Edit"
                         >
                           <Pencil size={16} />
                         </button>
+
                         <button
                           type="button"
-                          onClick={() => remove(item)}
+                          onClick={() =>
+                            handleDelete(item)
+                          }
                           className="rounded-lg bg-red-50 p-2 text-red-600 hover:bg-red-100"
                           title="Hapus"
                         >
@@ -219,71 +337,109 @@ function ItemPage() {
         </div>
       </div>
 
-      {open && (
+      {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
-          <form onSubmit={submit} className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+          <form
+            onSubmit={handleSubmit}
+            className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl"
+          >
             <h2 className="text-lg font-bold text-slate-900">
-              {editing ? "Edit Barang" : "Tambah Barang"}
+              {editingItem
+                ? "Edit Item"
+                : "Tambah Item"}
             </h2>
 
             <div className="mt-5 space-y-4">
-              <label className="block">
-                <span className="mb-1.5 block text-sm font-medium text-slate-700">Nama Barang</span>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Nama Item
+                </label>
+
                 <input
                   required
-                  maxLength={60}
+                  maxLength={100}
                   value={form.item_name}
-                  onChange={(e) => setForm({ ...form, item_name: e.target.value })}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      item_name: e.target.value,
+                    })
+                  }
+                  placeholder="Nama item"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
                 />
-              </label>
+              </div>
 
-              {!editing && (
-                <label className="block">
-                  <span className="mb-1.5 block text-sm font-medium text-slate-700">Stok Awal</span>
-                  <input
-                    required
-                    min="0"
-                    type="number"
-                    value={form.stock}
-                    onChange={(e) => setForm({ ...form, stock: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  />
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Stok
                 </label>
-              )}
 
-              <label className="block">
-                <span className="mb-1.5 block text-sm font-medium text-slate-700">Unit</span>
+                <input
+                  required
+                  type="number"
+                  min="0"
+                  value={form.stock}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      stock: e.target.value,
+                    })
+                  }
+                  placeholder="Stok"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Satuan
+                </label>
+
                 <select
                   required
                   value={form.unit_id}
-                  onChange={(e) => setForm({ ...form, unit_id: e.target.value })}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      unit_id: e.target.value,
+                    })
+                  }
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500"
                 >
-                  <option value="">Pilih unit</option>
+                  <option value="">
+                    Pilih satuan
+                  </option>
+
                   {units.map((unit) => (
-                    <option key={unit.unit_id} value={unit.unit_id}>
-                      {unit.unit_name} ({unit.unit_code})
+                    <option
+                      key={unit.unit_id}
+                      value={unit.unit_id}
+                    >
+                      {unit.unit_name}
                     </option>
                   ))}
                 </select>
-              </label>
+              </div>
             </div>
 
             <div className="mt-6 flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setOpen(false)}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                onClick={closeModal}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
               >
                 Batal
               </button>
+
               <button
                 disabled={saving}
                 type="submit"
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {saving ? "Menyimpan..." : "Simpan"}
+                {saving
+                  ? "Menyimpan..."
+                  : "Simpan"}
               </button>
             </div>
           </form>
