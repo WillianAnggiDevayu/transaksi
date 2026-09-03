@@ -10,6 +10,7 @@ import {
 
 import PurchaseRequestService from "../../services/PurchaseRequestService";
 import RequestSupplierService from "../../services/RequestSupplierService";
+import SupplierQuotationService from "../../services/SupplierQuotationService";
 import SupplierService from "../../services/SupplierService";
 import ItemService from "../../services/ItemService";
 
@@ -58,6 +59,7 @@ function PurchaseRequestPage() {
   const [search, setSearch] = useState("");
 
   const [loading, setLoading] = useState(false);
+  const [quotationLoadingId, setQuotationLoadingId] = useState(null);
   const [error, setError] = useState("");
 
   // LOAD DATA
@@ -202,6 +204,40 @@ function PurchaseRequestPage() {
       quotation.details ||
       []
     );
+  };
+
+  // Data quotation pada daftar supplier hanya berisi header. Ambil ulang
+  // detail Request Supplier agar relasi item quotation ikut dimuat.
+  const openQuotation = async (requestSupplier) => {
+    const requestSupplierId = requestSupplier.request_supplier_id;
+
+    setQuotationLoadingId(requestSupplierId);
+    setError("");
+
+    try {
+      const result =
+        await SupplierQuotationService.getRequestDetail(requestSupplierId);
+
+      const quotation =
+        result?.request_supplier_supplier_quotation ||
+        result?.requestSupplierSupplierQuotation ||
+        result?.supplier_quotation ||
+        null;
+
+      if (!quotation) {
+        throw new Error("Data penawaran tidak ditemukan.");
+      }
+
+      setSelectedQuotation(quotation);
+    } catch (e) {
+      setError(
+        e?.data?.message ||
+          e?.message ||
+          "Gagal mengambil detail penawaran."
+      );
+    } finally {
+      setQuotationLoadingId(null);
+    }
   };
 
   // =========================================================
@@ -617,14 +653,19 @@ function PurchaseRequestPage() {
                             <button
                               type="button"
                               onClick={() =>
-                                setSelectedQuotation(
-                                  quotation
-                                )
+                                openQuotation(r)
+                              }
+                              disabled={
+                                quotationLoadingId ===
+                                r.request_supplier_id
                               }
                               className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-100"
                             >
                               <Eye size={14} />
-                              Lihat Penawaran
+                              {quotationLoadingId ===
+                              r.request_supplier_id
+                                ? "Memuat..."
+                                : "Lihat Penawaran"}
                             </button>
 
                           </div>

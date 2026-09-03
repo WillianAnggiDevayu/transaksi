@@ -1,6 +1,14 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
 @import "tailwindcss";
 
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: #e2e8f0;
+  }
+}
 
 html,
 body,
@@ -14,6 +22,15 @@ body {
   font-family: "Inter", sans-serif;
   background: #f4f7fc;
   color: #1e293b;
+}
+
+thead th {
+  color: #0f172a;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
 }
 
 button,
