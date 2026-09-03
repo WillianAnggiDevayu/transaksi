@@ -33,6 +33,62 @@ thead th {
   text-transform: uppercase;
 }
 
+/* Ukuran seragam untuk tombol aksi utama Tambah/Buat. */
+button:has(> svg.lucide-plus) {
+  gap: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+button:has(> svg.lucide-plus) > svg {
+  width: 0.9375rem;
+  height: 0.9375rem;
+}
+
+/* Tampilan modal yang konsisten pada seluruh halaman administrasi. */
+[class*="fixed"][class*="inset-0"][class*="z-50"] {
+  backdrop-filter: blur(2px);
+}
+
+[class*="fixed"][class*="inset-0"][class*="z-50"] > form,
+[class*="fixed"][class*="inset-0"][class*="z-50"] > div {
+  max-height: 90vh;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  box-shadow: 0 24px 60px -18px rgb(15 23 42 / 0.35);
+}
+
+[class*="fixed"][class*="inset-0"][class*="z-50"] h2 {
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+[class*="fixed"][class*="inset-0"][class*="z-50"] :is(input, select, textarea) {
+  border-color: #cbd5e1;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  outline: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+[class*="fixed"][class*="inset-0"][class*="z-50"] :is(input, select, textarea):focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgb(59 130 246 / 0.12);
+}
+
+[class*="fixed"][class*="inset-0"][class*="z-50"] button {
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
 button,
 input,
 select,

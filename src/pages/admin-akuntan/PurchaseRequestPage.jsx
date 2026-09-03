@@ -13,6 +13,7 @@ import RequestSupplierService from "../../services/RequestSupplierService";
 import SupplierQuotationService from "../../services/SupplierQuotationService";
 import SupplierService from "../../services/SupplierService";
 import ItemService from "../../services/ItemService";
+import PurchaseOrderService from "../../services/PurchaseOrderService";
 
 const empty = {
   item_id: "",
@@ -60,6 +61,12 @@ function PurchaseRequestPage() {
 
   const [loading, setLoading] = useState(false);
   const [quotationLoadingId, setQuotationLoadingId] = useState(null);
+  const [poLoading, setPoLoading] = useState(false);
+  const [poForm, setPoForm] = useState({
+    order_date: new Date().toISOString().slice(0, 10),
+    expected_delivery_date: "",
+    notes: "",
+  });
   const [error, setError] = useState("");
 
   // LOAD DATA
@@ -206,6 +213,23 @@ function PurchaseRequestPage() {
     );
   };
 
+  const getItemDiscountSummary = (quotation) => {
+    const details = getQuotationDetails(quotation);
+    const percentages = [...new Set(
+      details
+        .map((detail) => Number(detail.discount_percentage || 0))
+        .filter((value) => value > 0)
+    )];
+
+    return {
+      amount: details.reduce(
+        (total, detail) => total + Number(detail.discount_amount || 0),
+        0
+      ),
+      label: percentages.length === 1 ? ` (${percentages[0]}%)` : "",
+    };
+  };
+
   // Data quotation pada daftar supplier hanya berisi header. Ambil ulang
   // detail Request Supplier agar relasi item quotation ikut dimuat.
   const openQuotation = async (requestSupplier) => {
@@ -229,6 +253,11 @@ function PurchaseRequestPage() {
       }
 
       setSelectedQuotation(quotation);
+      setPoForm({
+        order_date: new Date().toISOString().slice(0, 10),
+        expected_delivery_date: "",
+        notes: "",
+      });
     } catch (e) {
       setError(
         e?.data?.message ||
@@ -237,6 +266,33 @@ function PurchaseRequestPage() {
       );
     } finally {
       setQuotationLoadingId(null);
+    }
+  };
+
+  const createPurchaseOrder = async (event) => {
+    event.preventDefault();
+    setPoLoading(true);
+    setError("");
+
+    try {
+      await PurchaseOrderService.createFromQuotation(
+        selectedQuotation.supplier_quotation_id,
+        {
+          order_date: poForm.order_date,
+          expected_delivery_date:
+            poForm.expected_delivery_date || null,
+          notes: poForm.notes.trim() || null,
+        }
+      );
+      setSelectedQuotation(null);
+      await detail(selected);
+      await load();
+    } catch (e) {
+      setError(
+        e?.data?.message || e?.message || "Gagal membuat Purchase Order."
+      );
+    } finally {
+      setPoLoading(false);
     }
   };
 
@@ -930,23 +986,36 @@ function PurchaseRequestPage() {
                 {/* TOTAL QUOTATION */}
                 <div className="mt-6 flex justify-end">
 
-                  <div className="w-full max-w-sm space-y-3">
+                  <div className="w-full max-w-sm rounded-lg border border-slate-200 bg-slate-50/60 p-4">
 
-                    <div className="flex justify-between text-sm">
+                    <div className="flex items-center justify-between gap-4 text-xs">
+                      <span className="text-slate-500">
+                        Diskon Item
+                        {getItemDiscountSummary(selectedQuotation).label}
+                      </span>
+
+                      <span className="font-medium tabular-nums text-red-600">
+                        - {formatRupiah(
+                          getItemDiscountSummary(selectedQuotation).amount
+                        )}
+                      </span>
+                    </div>
+
+                    <div className="mt-2.5 flex items-center justify-between gap-4 text-xs">
                       <span className="text-slate-500">
                         Subtotal
                       </span>
 
-                      <span className="font-medium text-slate-800">
+                      <span className="font-medium tabular-nums text-slate-700">
                         {formatRupiah(
                           selectedQuotation.subtotal
                         )}
                       </span>
                     </div>
 
-                    <div className="flex justify-between text-sm">
+                    <div className="mt-2.5 flex items-center justify-between gap-4 text-xs">
                       <span className="text-slate-500">
-                        Diskon
+                        Diskon Tambahan
                         {" "}
                         (
                         {Number(
@@ -956,22 +1025,22 @@ function PurchaseRequestPage() {
                         %)
                       </span>
 
-                      <span className="font-medium text-slate-800">
-                        {formatRupiah(
+                      <span className="font-medium tabular-nums text-slate-700">
+                        - {formatRupiah(
                           selectedQuotation.discount_amount
                         )}
                       </span>
                     </div>
 
-                    <div className="border-t border-slate-200 pt-3">
+                    <div className="mt-3 border-t border-slate-200 pt-3">
 
-                      <div className="flex justify-between">
+                      <div className="flex items-center justify-between gap-4 text-sm">
 
-                        <span className="text-base font-semibold text-slate-900">
+                        <span className="font-semibold text-slate-800">
                           Total
                         </span>
 
-                        <span className="text-base font-bold text-blue-600">
+                        <span className="font-semibold tabular-nums text-blue-600">
                           {formatRupiah(
                             selectedQuotation.total
                           )}
@@ -998,6 +1067,43 @@ function PurchaseRequestPage() {
                   </div>
 
                 </div>
+
+                {selectedQuotation.status === "submitted" && (
+                  <form
+                    onSubmit={createPurchaseOrder}
+                    className="mt-6 rounded-xl border border-blue-200 bg-blue-50/50 p-5"
+                  >
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-900">
+                        Buat Purchase Order
+                      </h3>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Buat PO langsung dari penawaran supplier ini.
+                      </p>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <label>
+                        <span className="mb-1 block text-xs font-medium text-slate-600">Tanggal Order</span>
+                        <input required type="date" value={poForm.order_date} onChange={(event) => setPoForm({ ...poForm, order_date: event.target.value })} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm" />
+                      </label>
+                      <label>
+                        <span className="mb-1 block text-xs font-medium text-slate-600">Estimasi Tiba</span>
+                        <input type="date" value={poForm.expected_delivery_date} onChange={(event) => setPoForm({ ...poForm, expected_delivery_date: event.target.value })} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm" />
+                      </label>
+                      <label>
+                        <span className="mb-1 block text-xs font-medium text-slate-600">Catatan PO</span>
+                        <textarea value={poForm.notes} onChange={(event) => setPoForm({ ...poForm, notes: event.target.value })} className="min-h-20 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm" placeholder="Catatan opsional" />
+                      </label>
+                    </div>
+
+                    <div className="mt-4 flex justify-end">
+                      <button disabled={poLoading} className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
+                        {poLoading ? "Membuat PO..." : "Buat Purchase Order"}
+                      </button>
+                    </div>
+                  </form>
+                )}
 
               </div>
 

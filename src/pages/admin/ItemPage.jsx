@@ -186,7 +186,7 @@ function ItemPage() {
           </p>
 
           <h1 className="mt-1 text-2xl font-bold text-slate-900">
-            Item
+            Barang
           </h1>
 
           <p className="mt-1 text-sm text-slate-500">

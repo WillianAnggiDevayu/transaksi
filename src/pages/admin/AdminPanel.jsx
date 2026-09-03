@@ -40,7 +40,7 @@ function AdminPanel({ user, onLogout }) {
 
   const pages = {
     // Admin
-    dashboard: <DashboardAdmin />,
+    dashboard: <DashboardAdmin onNavigate={setMenu} />,
     items: <ItemPage />,
     units: <UnitPage />,
     suppliers: <SupplierPage />,

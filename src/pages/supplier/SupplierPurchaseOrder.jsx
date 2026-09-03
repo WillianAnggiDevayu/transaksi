@@ -10,6 +10,7 @@ function SupplierPurchaseOrder() {
   const [orders, setOrders] = useState([]);
   const [selected, setSelected] = useState(null);
   const [error, setError] = useState("");
+  const [statusLoading, setStatusLoading] = useState(false);
 
   const load = async () => {
     try {
@@ -27,12 +28,27 @@ function SupplierPurchaseOrder() {
     } catch (e) { setError(e.message || "Gagal memuat detail PO."); }
   };
 
+  const markAsShipped = async () => {
+    setStatusLoading(true);
+    setError("");
+    try {
+      await PurchaseOrderService.updateStatus(selected.purchase_order_id, "shipping");
+      await load();
+      const data = await PurchaseOrderService.getById(selected.purchase_order_id);
+      setSelected(data?.data || data);
+    } catch (e) {
+      setError(e?.data?.message || e.message || "Gagal mengubah status PO.");
+    } finally {
+      setStatusLoading(false);
+    }
+  };
+
   if (selected) {
     const details = selected.purchase_order_detail_purchase_order || selected.detail_purchase_orders || selected.details || [];
     return <section className="space-y-5">
       <div className="flex items-center gap-3"><button onClick={() => setSelected(null)} className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"><ArrowLeft size={17} /></button><div><p className="text-sm font-medium text-blue-600">Supplier</p><h1 className="mt-1 text-2xl font-bold">Detail Purchase Order</h1></div></div>
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><div className="grid grid-cols-1 gap-5 md:grid-cols-3"><Info label="No. PO" value={selected.po_number} strong /><Info label="Purchase Request" value={selected.purchase_order_purchase_request?.request_number || selected.purchase_request_id || "-"} /><Info label="Tanggal Order" value={selected.order_date} /><Info label="Estimasi Tiba" value={selected.expected_delivery_date || "-"} /><div><p className="text-xs text-slate-500">Status</p><span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${badge[selected.status] || "bg-slate-100 text-slate-600"}`}>{labels[selected.status] || selected.status}</span></div><Info label="Pembayaran" value={selected.payment_status || "unpaid"} /></div><div className="mt-5 rounded-lg bg-slate-50 p-4 text-sm text-slate-600">{selected.notes || "Tidak ada catatan."}</div></div>
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><div className="grid grid-cols-1 gap-5 md:grid-cols-3"><Info label="No. PO" value={selected.po_number} strong /><Info label="Purchase Request" value={selected.purchase_order_purchase_request?.request_number || selected.purchase_request_id || "-"} /><Info label="Tanggal Order" value={selected.order_date} /><Info label="Estimasi Tiba" value={selected.expected_delivery_date || "-"} /><div><p className="text-xs text-slate-500">Status</p><span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${badge[selected.status] || "bg-slate-100 text-slate-600"}`}>{labels[selected.status] || selected.status}</span></div><Info label="Pembayaran" value={selected.payment_status || "unpaid"} /></div><div className="mt-5 rounded-lg bg-slate-50 p-4 text-sm text-slate-600">{selected.notes || "Tidak ada catatan."}</div>{["draft", "sent", "accepted"].includes(selected.status) && <button disabled={statusLoading} onClick={markAsShipped} className="mt-5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{statusLoading ? "Memproses..." : "Tandai PO Dikirim"}</button>}</div>
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="mb-4 text-sm font-semibold">Detail Barang</h2><div className="overflow-hidden rounded-lg border border-slate-200"><div className="overflow-x-auto"><table className="w-full min-w-[700px]"><thead className="bg-slate-50"><tr>{["Barang", "Qty", "Harga", "Diskon", "Subtotal"].map((title, index) => <th key={title} className={`px-4 py-3 text-xs text-slate-500 ${index > 1 ? "text-right" : index === 1 ? "text-center" : "text-left"}`}>{title}</th>)}</tr></thead><tbody>{details.map((detail, index) => <tr key={detail.detail_purchase_order_id || index} className="border-t border-slate-100"><td className="px-4 py-3 text-sm">{detail.detail_purchase_order_item?.item_name || detail.item?.item_name || detail.item_id}</td><td className="px-4 py-3 text-center text-sm">{detail.quantity}</td><td className="px-4 py-3 text-right text-sm">{rupiah(detail.unit_price)}</td><td className="px-4 py-3 text-right text-sm">{detail.discount_percentage || 0}%</td><td className="px-4 py-3 text-right text-sm font-medium">{rupiah(detail.subtotal)}</td></tr>)}</tbody></table></div></div><div className="ml-auto mt-5 max-w-sm space-y-2 border-t border-slate-200 pt-4"><div className="flex justify-between text-sm"><span>Subtotal</span><b>{rupiah(selected.subtotal)}</b></div><div className="flex justify-between text-sm"><span>Diskon</span><b>{rupiah(selected.discount_amount)}</b></div><div className="flex justify-between border-t border-slate-200 pt-3 text-base font-bold"><span>Total</span><span>{rupiah(selected.total)}</span></div></div></div>
     </section>;
   }
