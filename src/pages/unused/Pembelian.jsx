@@ -10,7 +10,7 @@ function Pembelian({ supplier, barang, setPembelian }) {
 
   const [items, setItems] = useState([
     {
-      id: Date.now(),
+      id: 0,
       barangId: "",
       harga: "",
       jumlah: 0,
@@ -50,7 +50,11 @@ function Pembelian({ supplier, barang, setPembelian }) {
     setItems((currentItems) => [
       ...currentItems,
       {
-        id: Date.now(),
+        id:
+          currentItems.reduce(
+            (highestId, item) => Math.max(highestId, item.id),
+            0
+          ) + 1,
         barangId: "",
         harga: "",
         jumlah: 0,
@@ -152,7 +156,7 @@ function Pembelian({ supplier, barang, setPembelian }) {
 
       setItems([
         {
-          id: Date.now(),
+          id: 0,
           barangId: "",
           harga: "",
           jumlah: 0,

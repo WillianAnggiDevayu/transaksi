@@ -18,7 +18,10 @@ function SupplierPurchaseOrder() {
       setOrders(Array.isArray(data) ? data : []);
     } catch (e) { setError(e.message || "Gagal memuat purchase order."); }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const loadTimer = window.setTimeout(load, 0);
+    return () => window.clearTimeout(loadTimer);
+  }, []);
 
   const open = async (order) => {
     try {

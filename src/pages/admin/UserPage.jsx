@@ -19,7 +19,10 @@ const ROLE_OPTIONS = [
 
 function UserPage({ currentUser }) {
   const { data: usersData, loading } = useCachedList("users", UserService);
-  const users = Array.isArray(usersData) ? usersData : [];
+  const users = useMemo(
+    () => (Array.isArray(usersData) ? usersData : []),
+    [usersData]
+  );
 
   const [search, setSearch] = useState("");
   const [form, setForm] = useState(EMPTY_FORM);

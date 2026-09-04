@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ChevronRight, LayoutDashboard, FileText, ShoppingCart, LogOut, Menu, X } from "lucide-react";
 import SupplierDashboard from "./SupplierDashboard";
 import RequestOrder from "./RequestOrder";

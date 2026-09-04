@@ -25,9 +25,10 @@ function SupplierPage() {
         loading: suppliersLoading,
     } = useCachedList("suppliers", SupplierService);
 
-    const suppliers = Array.isArray(suppliersData)
-        ? suppliersData
-        : [];
+    const suppliers = useMemo(
+        () => (Array.isArray(suppliersData) ? suppliersData : []),
+        [suppliersData]
+    );
 
     // Data User
     const {

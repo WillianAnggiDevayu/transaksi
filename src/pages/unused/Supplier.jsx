@@ -1,8 +1,6 @@
 import { useState } from "react";
 import SupplierService from "../services/SupplierService";
 
-import SupplierFormModal from "../pages/modal/SupplierFormModal";
-
 function Supplier({ supplier, setSupplier, user }) {
   const [search, setSearch] = useState("");
 

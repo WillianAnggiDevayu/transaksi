@@ -25,7 +25,10 @@ function RequestOrder() {
       setRequests(Array.isArray(data) ? data : []);
     } catch (e) { setError(e.message || "Gagal memuat request supplier."); }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const loadTimer = window.setTimeout(load, 0);
+    return () => window.clearTimeout(loadTimer);
+  }, []);
 
   const detailRows = selected?.request_supplier_purchase_request?.purchase_request_detail_purchase_request || [];
   const itemName = (row) => row?.detail_purchase_request_item?.item_name || row?.item?.item_name || row?.item_id || "-";

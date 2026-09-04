@@ -15,8 +15,14 @@ function ItemPage() {
     loading: unitsLoading,
   } = useCachedList("units", UnitService);
 
-  const items = Array.isArray(itemsData) ? itemsData : [];
-  const units = Array.isArray(unitsData) ? unitsData : [];
+  const items = useMemo(
+    () => (Array.isArray(itemsData) ? itemsData : []),
+    [itemsData]
+  );
+  const units = useMemo(
+    () => (Array.isArray(unitsData) ? unitsData : []),
+    [unitsData]
+  );
 
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);

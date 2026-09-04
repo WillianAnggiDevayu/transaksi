@@ -10,7 +10,10 @@ function PaymentPage() {
   const [form, setForm] = useState({ purchaseOrderId: "", paymentNumber: "", amount: "", paymentMethod: "bank_transfer", paymentDate: new Date().toISOString().slice(0, 10), notes: "" });
 
   const load = async () => { try { const result = await PurchaseOrderService.getAll(); const orderList = Array.isArray(result) ? result : []; setOrders(orderList); const list = []; for (const order of orderList) { try { const data = await PaymentService.getByPurchaseOrder(order.purchase_order_id); (Array.isArray(data) ? data : []).forEach((payment) => list.push({ ...payment, purchaseOrder: order })); } catch { /* PO tanpa payment */ } } setPayments(list); } catch (e) { setError(e.message); } };
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const loadTimer = window.setTimeout(load, 0);
+    return () => window.clearTimeout(loadTimer);
+  }, []);
   const filtered = useMemo(() => { const query = search.toLowerCase(); return payments.filter((payment) => `${payment.payment_number || ""} ${payment.status || ""} ${payment.purchaseOrder?.po_number || ""}`.toLowerCase().includes(query)); }, [payments, search]);
   const detail = async (payment) => { try { const data = await PaymentService.getById(payment.payment_id); setSelected(data?.data || data); } catch (e) { setError(e.message); } };
   const action = async (payment, type) => { try { if (type === "submit") await PaymentService.submit(payment.payment_id); if (type === "confirm") await PaymentService.confirm(payment.payment_id); if (type === "reject") await PaymentService.reject(payment.payment_id); await load(); setSelected(null); } catch (e) { setError(e?.data?.message || e.message); } };

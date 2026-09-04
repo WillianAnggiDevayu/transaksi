@@ -27,8 +27,6 @@ export default function useOnlineStatus() {
   }, [refreshPendingCount]);
 
   useEffect(() => {
-    refreshPendingCount();
-
     const handleOnline = () => {
       setIsOnline(true);
       sync();
@@ -42,11 +40,18 @@ export default function useOnlineStatus() {
     window.addEventListener("pms-queue-changed", handleQueueChanged);
     window.addEventListener("pms-sync-complete", handleQueueChanged);
 
-    // Coba sinkron sekali saat pertama kali dimuat, jika kebetulan online
-    // dan ada sisa antrian dari sesi sebelumnya.
-    if (navigator.onLine) sync();
+    // Jalankan inisialisasi setelah effect selesai agar pembaruan state
+    // selalu berasal dari callback asynchronous.
+    const initializeTimer = window.setTimeout(() => {
+      refreshPendingCount();
+
+      // Coba sinkron sekali saat pertama kali dimuat, jika kebetulan online
+      // dan ada sisa antrian dari sesi sebelumnya.
+      if (navigator.onLine) sync();
+    }, 0);
 
     return () => {
+      window.clearTimeout(initializeTimer);
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
       window.removeEventListener("pms-queue-changed", handleQueueChanged);

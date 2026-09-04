@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Mail, LockKeyhole, LogIn } from "lucide-react";
+import { Mail, LogIn } from "lucide-react";
 import { Eye, EyeOff } from "lucide-react";
 import AuthService from "../services/AuthService";
 

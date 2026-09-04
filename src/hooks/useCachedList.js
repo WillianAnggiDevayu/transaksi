@@ -74,31 +74,29 @@ export default function useCachedList(
         );
 
         /*
-         * Gunakan cache jika tersedia.
+         * Inisialisasi state dijadwalkan setelah effect selesai. Ini juga
+         * menangani perubahan cacheKey tanpa melakukan setState sinkron di
+         * dalam effect.
          */
-        if (CacheStore.has(cacheKey)) {
-            const cached = CacheStore.get(cacheKey);
+        const initializeTimer = window.setTimeout(() => {
+            if (!mounted) return;
 
-            if (Array.isArray(cached)) {
-                setData(cached);
-                setLoading(false);
+            if (CacheStore.has(cacheKey)) {
+                const cached = CacheStore.get(cacheKey);
+
+                if (Array.isArray(cached)) {
+                    handleCacheUpdate(cached);
+                } else {
+                    CacheStore.clear(cacheKey);
+                }
             } else {
-                /*
-                 * Cache ada tetapi formatnya tidak valid.
-                 * Bersihkan lalu ambil ulang dari API.
-                 */
-                CacheStore.clear(cacheKey);
+                fetchData();
             }
-        } else {
-            /*
-             * Cache belum tersedia.
-             * Ambil data dari API.
-             */
-            fetchData();
-        }
+        }, 0);
 
         return () => {
             mounted = false;
+            window.clearTimeout(initializeTimer);
             unsubscribe();
         };
     }, [cacheKey, fetchData]);

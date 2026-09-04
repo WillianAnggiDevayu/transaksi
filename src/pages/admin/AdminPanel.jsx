@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import AdminSidebar from "./components/AdminSidebar";
 import AdminHeader from "./components/AdminHeader";
@@ -34,13 +34,14 @@ function AdminPanel({ user, onLogout }) {
   const [menu, setMenu] = useState(MENU.dashboard);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  useEffect(() => {
+  const navigate = (nextMenu) => {
+    setMenu(nextMenu);
     setMobileOpen(false);
-  }, [menu]);
+  };
 
   const pages = {
     // Admin
-    dashboard: <DashboardAdmin onNavigate={setMenu} />,
+    dashboard: <DashboardAdmin onNavigate={navigate} />,
     items: <ItemPage />,
     units: <UnitPage />,
     suppliers: <SupplierPage />,
@@ -57,7 +58,7 @@ function AdminPanel({ user, onLogout }) {
     <div className="min-h-screen bg-slate-50 text-slate-800">
       <AdminSidebar
         menu={menu}
-        setMenu={setMenu}
+        setMenu={navigate}
         mobileOpen={mobileOpen}
         setMobileOpen={setMobileOpen}
         onLogout={onLogout}

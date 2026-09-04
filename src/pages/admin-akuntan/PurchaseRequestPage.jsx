@@ -99,7 +99,8 @@ function PurchaseRequestPage() {
   };
 
   useEffect(() => {
-    load();
+    const loadTimer = window.setTimeout(load, 0);
+    return () => window.clearTimeout(loadTimer);
   }, []);
 
   // SEARCH
