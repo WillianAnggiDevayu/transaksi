@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Pencil, Plus, Search, Trash2 } from "lucide-react";
 import useCachedList from "../../hooks/useCachedList";
 import UserService from "../../services/UserService";
+import { confirmAction } from "../../services/ConfirmationService";
 
 const EMPTY_FORM = {
   name: "",
@@ -115,7 +116,12 @@ function UserPage({ currentUser }) {
       return;
     }
 
-    if (!window.confirm(`Hapus user "${user.name}"?`)) return;
+    const confirmed = await confirmAction({
+      title: "Hapus user?",
+      message: `User "${user.name}" akan dihapus permanen dari sistem.`,
+    });
+
+    if (!confirmed) return;
 
     setError("");
 

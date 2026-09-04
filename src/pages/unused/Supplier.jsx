@@ -1,5 +1,6 @@
 import { useState } from "react";
 import SupplierService from "../services/SupplierService";
+import { confirmAction } from "../../services/ConfirmationService";
 
 function Supplier({ supplier, setSupplier, user }) {
   const [search, setSearch] = useState("");
@@ -62,7 +63,12 @@ function Supplier({ supplier, setSupplier, user }) {
   };
 
   const hapusSupplier = async (id) => {
-    if (!window.confirm("Hapus supplier ini?")) return;
+    const confirmed = await confirmAction({
+      title: "Hapus supplier?",
+      message: "Supplier ini akan dihapus permanen dari sistem.",
+    });
+
+    if (!confirmed) return;
 
     try {
       await SupplierService.delete(id);

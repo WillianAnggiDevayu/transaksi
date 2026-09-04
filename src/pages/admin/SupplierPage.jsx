@@ -4,6 +4,7 @@ import { Pencil, Plus, Search, Trash2 } from "lucide-react";
 import SupplierService from "../../services/SupplierService";
 import UserService from "../../services/UserService";
 import useCachedList from "../../hooks/useCachedList";
+import { confirmAction } from "../../services/ConfirmationService";
 
 const emptyForm = {
     // Akun Supplier
@@ -327,13 +328,12 @@ function SupplierPage() {
 
     // Hapus Supplier
     const remove = async (supplier) => {
-        if (
-            !window.confirm(
-                `Hapus supplier "${supplier.supplier_name}"?`
-            )
-        ) {
-            return;
-        }
+        const confirmed = await confirmAction({
+            title: "Hapus supplier?",
+            message: `Supplier "${supplier.supplier_name}" akan dihapus permanen dari sistem.`,
+        });
+
+        if (!confirmed) return;
 
         setError("");
 

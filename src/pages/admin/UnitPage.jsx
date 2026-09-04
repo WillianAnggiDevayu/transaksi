@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Pencil, Plus, Search, Trash2 } from "lucide-react";
 import UnitService from "../../services/UnitService";
 import useCachedList from "../../hooks/useCachedList";
+import { confirmAction } from "../../services/ConfirmationService";
 
 const emptyForm = {
   unit_name: "",
@@ -88,13 +89,12 @@ function UnitPage() {
   };
 
   const remove = async (unit) => {
-    if (
-      !window.confirm(
-        `Hapus unit "${unit.unit_name}"?`
-      )
-    ) {
-      return;
-    }
+    const confirmed = await confirmAction({
+      title: "Hapus unit?",
+      message: `Unit "${unit.unit_name}" akan dihapus permanen dari sistem.`,
+    });
+
+    if (!confirmed) return;
 
     setError("");
 

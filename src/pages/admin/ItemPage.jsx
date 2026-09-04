@@ -3,6 +3,7 @@ import { Pencil, Plus, Search, Trash2 } from "lucide-react";
 import ItemService from "../../services/ItemService";
 import UnitService from "../../services/UnitService";
 import useCachedList from "../../hooks/useCachedList";
+import { confirmAction } from "../../services/ConfirmationService";
 
 function ItemPage() {
   const {
@@ -162,13 +163,12 @@ function ItemPage() {
   };
 
   const handleDelete = async (item) => {
-    if (
-      !window.confirm(
-        `Hapus item "${item.item_name}"?`
-      )
-    ) {
-      return;
-    }
+    const confirmed = await confirmAction({
+      title: "Hapus item?",
+      message: `Item "${item.item_name}" akan dihapus permanen dari sistem.`,
+    });
+
+    if (!confirmed) return;
 
     setError("");
 

@@ -1,4 +1,5 @@
 import OfflineQueue from "./OfflineQueue";
+import { notifyMutationSuccess } from "./NotificationService";
 
 const API_URL =
   import.meta.env.VITE_API_URL ||
@@ -81,6 +82,13 @@ class ApiClient {
       error.data = data;
 
       throw error;
+    }
+
+    const method = (options.method || "GET").toUpperCase();
+    const isAuthenticationRequest = ["/login", "/logout"].includes(path);
+
+    if (!isAuthenticationRequest) {
+      notifyMutationSuccess(method, data);
     }
 
     return data;
