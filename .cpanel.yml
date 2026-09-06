@@ -1,6 +1,4 @@
 ---
 deployment:
   tasks:
-    - /bin/rm -rf /home/knjsnjuv/public_html/assets
-    - /bin/rm -f /home/knjsnjuv/public_html/index.html
     - /bin/cp -R dist/. /home/knjsnjuv/public_html/
