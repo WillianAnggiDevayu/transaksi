@@ -1,4 +1,6 @@
 import OfflineQueue from "./OfflineQueue";
+import { requiresOnline } from "../utils/procurement";
+import CacheStore from "./CacheStore";
 import { notifyMutationSuccess } from "./NotificationService";
 
 const API_URL =
@@ -88,6 +90,7 @@ class ApiClient {
     const isAuthenticationRequest = ["/login", "/logout"].includes(path);
 
     if (!isAuthenticationRequest) {
+      if (!["GET", "HEAD"].includes(method)) CacheStore.clearAll();
       notifyMutationSuccess(method, data);
     }
 
@@ -126,10 +129,13 @@ class ApiClient {
     const headers = this.buildHeaders(options);
     const method = (options.method || "GET").toUpperCase();
     const isMutating = method !== "GET";
+    const onlineOnly = requiresOnline(path, method);
+    const offlineError = () => new Error("Transaksi ini memerlukan koneksi online. Isian tetap tersimpan di form; periksa data server sebelum mencoba lagi.");
 
     // Jika browser sudah tahu sedang offline, langsung antre tanpa
     // menunggu fetch timeout.
     if (isMutating && typeof navigator !== "undefined" && navigator.onLine === false) {
+      if (onlineOnly) throw offlineError();
       return this.queueMutation(path, options);
     }
 
@@ -137,6 +143,7 @@ class ApiClient {
       return await this.performFetch(path, options, headers);
     } catch (err) {
       if (isMutating && this.isNetworkError(err)) {
+        if (onlineOnly) throw offlineError();
         return this.queueMutation(path, options);
       }
       throw err;
@@ -190,6 +197,7 @@ class ApiClient {
     let failed = 0;
 
     for (const item of queue) {
+      if (requiresOnline(item.path, item.method)) continue;
       try {
         const headers = this.buildHeaders({
           body: item.payload ? JSON.stringify(item.payload) : undefined,

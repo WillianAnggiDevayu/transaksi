@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
 import ApiClient from "../services/ApiClient";
 import OfflineQueue from "../services/OfflineQueue";
+import { requiresOnline } from "../utils/procurement";
 
 export default function useOnlineStatus() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [pendingCount, setPendingCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
+  const [manualCount, setManualCount] = useState(0);
 
   const refreshPendingCount = useCallback(async () => {
-    setPendingCount(await OfflineQueue.getPendingCount());
+    const queue = await OfflineQueue.getQueue();
+    setPendingCount(queue.length);
+    setManualCount(queue.filter(item => requiresOnline(item.path, item.method)).length);
   }, []);
 
   const sync = useCallback(async () => {
@@ -59,5 +63,5 @@ export default function useOnlineStatus() {
     };
   }, [refreshPendingCount, sync]);
 
-  return { isOnline, pendingCount, syncing, syncNow: sync };
+  return { isOnline, pendingCount, manualCount, syncing, syncNow: sync };
 }

@@ -14,6 +14,8 @@ import SupplierQuotationService from "../../services/SupplierQuotationService";
 import SupplierService from "../../services/SupplierService";
 import ItemService from "../../services/ItemService";
 import PurchaseOrderService from "../../services/PurchaseOrderService";
+import { PackagingTable, QuantitySummary, ErrorDetails } from "../../components/ProcurementDetails";
+import { localDate, poPayload, canEditQuotation } from "../../utils/procurement";
 
 const empty = {
   item_id: "",
@@ -53,7 +55,7 @@ function PurchaseRequestPage() {
   const [supplierIds, setSupplierIds] = useState([]);
 
   const [date, setDate] = useState(
-    new Date().toISOString().slice(0, 10)
+    localDate()
   );
 
   const [notes, setNotes] = useState("");
@@ -63,39 +65,25 @@ function PurchaseRequestPage() {
   const [quotationLoadingId, setQuotationLoadingId] = useState(null);
   const [poLoading, setPoLoading] = useState(false);
   const [poForm, setPoForm] = useState({
-    order_date: new Date().toISOString().slice(0, 10),
-    expected_delivery_date: "",
+    order_date: localDate(),
+    accept_quantity_difference: false,
     notes: "",
   });
   const [error, setError] = useState("");
 
+  const [masterAccess, setMasterAccess] = useState({ items: false, suppliers: false });
+  const [masterError, setMasterError] = useState("");
+
   // LOAD DATA
   const load = async () => {
-    try {
-      const [r, s, i] = await Promise.all([
-        PurchaseRequestService.getAll(),
-        SupplierService.getAll(),
-        ItemService.getAll(),
-      ]);
-
-      setRequests(
-        Array.isArray(r) ? r : []
-      );
-
-      setSuppliers(
-        Array.isArray(s) ? s : []
-      );
-
-      setItems(
-        Array.isArray(i) ? i : []
-      );
-    } catch (e) {
-      setError(
-        e?.data?.message ||
-          e?.message ||
-          "Gagal mengambil data."
-      );
-    }
+    const [r, s, i] = await Promise.allSettled([PurchaseRequestService.getAll(), SupplierService.getAll(), ItemService.getAll()]);
+    if (r.status === "fulfilled") setRequests(Array.isArray(r.value) ? r.value : []);
+    else setError(r.reason.message || "Gagal mengambil PR.");
+    setSuppliers(s.status === "fulfilled" && Array.isArray(s.value) ? s.value : []);
+    setItems(i.status === "fulfilled" && Array.isArray(i.value) ? i.value : []);
+    setMasterAccess({ items: i.status === "fulfilled", suppliers: s.status === "fulfilled" });
+    setMasterError([s.status === "rejected" ? "Daftar supplier tidak dapat diakses. Pengiriman request dinonaktifkan." : "",
+      i.status === "rejected" ? "Daftar barang tidak dapat diakses. Pembuatan PR dinonaktifkan." : ""].filter(Boolean).join(" "));
   };
 
   useEffect(() => {
@@ -255,8 +243,8 @@ function PurchaseRequestPage() {
 
       setSelectedQuotation(quotation);
       setPoForm({
-        order_date: new Date().toISOString().slice(0, 10),
-        expected_delivery_date: "",
+        order_date: localDate(),
+        accept_quantity_difference: false,
         notes: "",
       });
     } catch (e) {
@@ -270,20 +258,26 @@ function PurchaseRequestPage() {
     }
   };
 
+  const selectedSummary = selectedQuotation?.quantity_summary || [];
+  const hasDifference = selectedSummary.some(row => Number(row.difference) !== 0);
+
   const createPurchaseOrder = async (event) => {
     event.preventDefault();
     setPoLoading(true);
     setError("");
 
     try {
+      const response = await SupplierQuotationService.getRequestDetail(selectedQuotation.request_supplier_id);
+      const latest = response.request_supplier_supplier_quotation;
+      if (!latest || latest.status !== "submitted") throw new Error("Penawaran sudah tidak dapat dipilih. Muat ulang detail penawaran.");
+      if (JSON.stringify(latest.quantity_summary) !== JSON.stringify(selectedQuotation.quantity_summary) || String(latest.total) !== String(selectedQuotation.total)) {
+        setSelectedQuotation(latest);
+        setPoForm(previous => ({ ...previous, accept_quantity_difference: false }));
+        throw new Error("Penawaran telah berubah. Periksa ulang jumlah dan harga sebelum membuat PO.");
+      }
       await PurchaseOrderService.createFromQuotation(
         selectedQuotation.supplier_quotation_id,
-        {
-          order_date: poForm.order_date,
-          expected_delivery_date:
-            poForm.expected_delivery_date || null,
-          notes: poForm.notes.trim() || null,
-        }
+        poPayload(poForm, selectedSummary)
       );
       setSelectedQuotation(null);
       await detail(selected);
@@ -473,7 +467,8 @@ function PurchaseRequestPage() {
           </button>
         </div>
 
-        {/* ERROR */}
+        {masterError && <div role="status" className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">{masterError}</div>}
+      {/* ERROR */}
         {error && (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
@@ -530,8 +525,10 @@ function PurchaseRequestPage() {
               "draft" && (
               <button
                 type="button"
+                disabled={!masterAccess.suppliers}
+                title={masterError}
                 onClick={() =>
-                  setSend(true)
+                  (masterAccess.suppliers ? setSend(true) : setError(masterError))
                 }
                 className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"
               >
@@ -580,6 +577,7 @@ function PurchaseRequestPage() {
                     d.detail_purchase_request_item;
 
                   const unit =
+                    d.base_unit?.unit_name ||
                     item?.item_unit?.unit_name ||
                     item?.itemUnit?.unit_name ||
                     item?.unit_name ||
@@ -849,137 +847,8 @@ function PurchaseRequestPage() {
 
                   <div className="overflow-x-auto rounded-lg border border-slate-200">
 
-                    <table className="w-full min-w-[850px] text-left">
-
-                      <thead className="bg-slate-50">
-                        <tr>
-
-                          <th className="p-3 text-xs font-semibold uppercase text-slate-500">
-                            No
-                          </th>
-
-                          <th className="p-3 text-xs font-semibold uppercase text-slate-500">
-                            Barang
-                          </th>
-
-                          <th className="p-3 text-xs font-semibold uppercase text-slate-500">
-                            Qty
-                          </th>
-
-                          <th className="p-3 text-xs font-semibold uppercase text-slate-500">
-                            Satuan
-                          </th>
-
-                          <th className="p-3 text-right text-xs font-semibold uppercase text-slate-500">
-                            Harga Satuan
-                          </th>
-
-                          <th className="p-3 text-right text-xs font-semibold uppercase text-slate-500">
-                            Diskon
-                          </th>
-
-                          <th className="p-3 text-right text-xs font-semibold uppercase text-slate-500">
-                            Subtotal
-                          </th>
-
-                        </tr>
-                      </thead>
-
-                      <tbody>
-
-                        {getQuotationDetails(
-                          selectedQuotation
-                        ).map((detail, index) => {
-
-                          const purchaseDetail =
-                            detail
-                              .detail_supplier_quotation_purchase_request_detail ||
-                            detail
-                              .detailSupplierQuotationPurchaseRequestDetail ||
-                            null;
-
-                          const item =
-                            purchaseDetail?.detail_purchase_request_item ||
-                            purchaseDetail?.detailPurchaseRequestItem ||
-                            detail.item ||
-                            null;
-
-                          const quantity =
-                            purchaseDetail?.quantity ||
-                            detail.quantity ||
-                            0;
-
-                          const unit =
-                            item?.item_unit?.unit_name ||
-                            item?.itemUnit?.unit_name ||
-                            item?.unit_name ||
-                            "-";
-
-                          return (
-                            <tr
-                              key={
-                                detail.detail_supplier_quotation_id ||
-                                index
-                              }
-                              className="border-t border-slate-100"
-                            >
-
-                              <td className="p-3 text-sm text-slate-500">
-                                {index + 1}
-                              </td>
-
-                              <td className="p-3 text-sm font-medium text-slate-800">
-                                {item?.item_name ||
-                                  "-"}
-                              </td>
-
-                              <td className="p-3 text-sm text-slate-700">
-                                {quantity}
-                              </td>
-
-                              <td className="p-3 text-sm text-slate-600">
-                                {unit}
-                              </td>
-
-                              <td className="p-3 text-right text-sm text-slate-700">
-                                {formatRupiah(
-                                  detail.unit_price
-                                )}
-                              </td>
-
-                              <td className="p-3 text-right text-sm text-slate-700">
-                                {Number(
-                                  detail.discount_percentage ||
-                                    0
-                                )}%
-                              </td>
-
-                              <td className="p-3 text-right text-sm font-medium text-slate-800">
-                                {formatRupiah(
-                                  detail.subtotal
-                                )}
-                              </td>
-
-                            </tr>
-                          );
-                        })}
-
-                        {!getQuotationDetails(
-                          selectedQuotation
-                        ).length && (
-                          <tr>
-                            <td
-                              colSpan="7"
-                              className="p-8 text-center text-sm text-slate-400"
-                            >
-                              Detail penawaran belum tersedia.
-                            </td>
-                          </tr>
-                        )}
-
-                      </tbody>
-
-                    </table>
+                    <PackagingTable lines={getQuotationDetails(selectedQuotation)} />
+                    <div className="mt-4"><QuantitySummary summary={selectedSummary} requests={selected?.purchase_request_detail_purchase_request || selected?.details || []} /></div>
 
                   </div>
                 </div>
@@ -1069,7 +938,7 @@ function PurchaseRequestPage() {
 
                 </div>
 
-                {selectedQuotation.status === "submitted" && (
+                {selectedQuotation.status === "submitted" && canEditQuotation(selectedQuotation) && (
                   <form
                     onSubmit={createPurchaseOrder}
                     className="mt-6 rounded-xl border border-blue-200 bg-blue-50/50 p-5"
@@ -1088,18 +957,20 @@ function PurchaseRequestPage() {
                         <span className="mb-1 block text-xs font-medium text-slate-600">Tanggal Order</span>
                         <input required type="date" value={poForm.order_date} onChange={(event) => setPoForm({ ...poForm, order_date: event.target.value })} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm" />
                       </label>
-                      <label>
-                        <span className="mb-1 block text-xs font-medium text-slate-600">Estimasi Tiba</span>
-                        <input type="date" value={poForm.expected_delivery_date} onChange={(event) => setPoForm({ ...poForm, expected_delivery_date: event.target.value })} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm" />
-                      </label>
+
                       <label>
                         <span className="mb-1 block text-xs font-medium text-slate-600">Catatan PO</span>
                         <textarea value={poForm.notes} onChange={(event) => setPoForm({ ...poForm, notes: event.target.value })} className="min-h-20 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm" placeholder="Catatan opsional" />
                       </label>
                     </div>
 
+                    <ErrorDetails error={error} />
+                    {hasDifference && <label className="mt-4 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm">
+                      <input type="checkbox" checked={poForm.accept_quantity_difference} onChange={e => setPoForm({ ...poForm, accept_quantity_difference: e.target.checked })} />
+                      Saya sudah memeriksa dan menyetujui kelebihan/kekurangan quantity pada penawaran ini.
+                    </label>}
                     <div className="mt-4 flex justify-end">
-                      <button disabled={poLoading} className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
+                      <button disabled={poLoading || (hasDifference && !poForm.accept_quantity_difference)} className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
                         {poLoading ? "Membuat PO..." : "Buat Purchase Order"}
                       </button>
                     </div>
@@ -1258,8 +1129,10 @@ function PurchaseRequestPage() {
 
         <button
           type="button"
+          disabled={!masterAccess.items}
+          title={masterError}
           onClick={() =>
-            setCreate(true)
+            (masterAccess.items ? setCreate(true) : setError(masterError))
           }
           className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
         >
@@ -1269,6 +1142,7 @@ function PurchaseRequestPage() {
 
       </div>
 
+      {masterError && <div role="status" className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">{masterError}</div>}
       {/* ERROR */}
       {error && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

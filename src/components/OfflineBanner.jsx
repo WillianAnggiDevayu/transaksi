@@ -2,7 +2,7 @@ import { WifiOff, RefreshCw } from "lucide-react";
 import useOnlineStatus from "../hooks/useOnlineStatus";
 
 function OfflineBanner() {
-  const { isOnline, pendingCount, syncing, syncNow } = useOnlineStatus();
+  const { isOnline, pendingCount, manualCount, syncing, syncNow } = useOnlineStatus();
 
   if (isOnline && pendingCount === 0) return null;
 
@@ -19,10 +19,11 @@ function OfflineBanner() {
           {!isOnline
             ? "Anda sedang offline. Data yang ditampilkan mungkin tidak terbaru."
             : `${pendingCount} perubahan menunggu sinkronisasi.`}
+          {manualCount > 0 && <span className="ml-2">{manualCount} transaksi lama perlu pemeriksaan manual di data server; tidak dikirim ulang otomatis.</span>}
         </span>
       </div>
 
-      {isOnline && pendingCount > 0 && (
+      {isOnline && pendingCount > manualCount && (
         <button
           type="button"
           onClick={syncNow}

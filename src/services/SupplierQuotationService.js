@@ -40,6 +40,14 @@ class SupplierQuotationService {
         return result;
     }
 
+    async addDetail(quotationId, payload) {
+        return ApiClient.post("/supplier-quotations/" + quotationId + "/details", payload);
+    }
+
+    async deleteDetail(quotationId, detailId) {
+        return ApiClient.delete("/supplier-quotations/" + quotationId + "/details/" + detailId);
+    }
+
     async updateHeader(quotationId, payload) {
         const result = await ApiClient.patch(
             `/supplier-quotations/${quotationId}`,

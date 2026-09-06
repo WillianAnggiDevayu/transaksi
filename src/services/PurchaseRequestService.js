@@ -34,17 +34,15 @@ class PurchaseRequestService {
 
             rawItems = Array.isArray(data) ? data : [];
         } catch (err) {
-            console.warn(
-                "Gagal memuat purchase request:",
-                err.message
-            );
+            if (err?.status) throw err;
+            console.warn("Gagal memuat purchase request:", err.message);
         }
 
         const items = rawItems.map((item) =>
             this.normalize(item)
         );
 
-        const result = OfflineQueue.mergeOptimistic(
+        const result = await OfflineQueue.mergeOptimistic(
             "purchase-requests",
             "purchase_request_id",
             items,

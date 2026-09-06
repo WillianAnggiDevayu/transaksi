@@ -1,4 +1,8 @@
 import ApiClient from "./ApiClient";
+import AuthService from "./AuthService";
+import { isOwner } from "../utils/procurement";
+
+const visible = rows => { const user = AuthService.getUser(); return user?.role === "supplier" ? rows.filter(po => isOwner(po, user)) : rows; };
 import CacheStore from "./CacheStore";
 
 const CACHE_KEY = "purchase-orders";
@@ -6,7 +10,7 @@ const CACHE_KEY = "purchase-orders";
 class PurchaseOrderService {
     async getAll() {
         if (CacheStore.has(CACHE_KEY)) {
-            return CacheStore.get(CACHE_KEY);
+            return visible(CacheStore.get(CACHE_KEY));
         }
 
         const response = await ApiClient.get(
@@ -18,7 +22,7 @@ class PurchaseOrderService {
 
         CacheStore.set(CACHE_KEY, data);
 
-        return data;
+        return visible(data);
     }
 
     async getById(id) {
@@ -26,7 +30,10 @@ class PurchaseOrderService {
             `/purchase-orders/${id}`
         );
 
-        return response?.data || response;
+        const po = response?.data || response;
+        const user = AuthService.getUser();
+        if (user?.role === "supplier" && !isOwner(po, user)) throw new Error("PO ini bukan milik akun supplier Anda.");
+        return po;
     }
 
     async createFromQuotation(
@@ -54,10 +61,14 @@ class PurchaseOrderService {
         return result;
     }
 
-    async updateStatus(id, status) {
+    async updateDeliveryEstimate(id, payload) {
+        return ApiClient.patch("/purchase-orders/" + id + "/delivery-estimate", { expected_delivery_date: payload.expected_delivery_date });
+    }
+
+    async updateStatus(id, status, dates = {}) {
         const result = await ApiClient.patch(
             `/purchase-orders/${id}/status`,
-            { status }
+            { ...dates, status }
         );
 
         CacheStore.clear(CACHE_KEY);

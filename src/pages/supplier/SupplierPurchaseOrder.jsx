@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, Eye } from "lucide-react";
 import PurchaseOrderService from "../../services/PurchaseOrderService";
+import AuthService from "../../services/AuthService";
+import { isOwner, localDate, dateOnly, shippingPayload } from "../../utils/procurement";
+import { ErrorDetails } from "../../components/ProcurementDetails";
+import { PackagingTable } from "../../components/ProcurementDetails";
 
 const labels = { draft: "Draft", sent: "Dikirim", accepted: "Diterima", shipping: "Dikirim", delivered: "Barang Diterima", completed: "Selesai", failed: "Gagal", cancelled: "Dibatalkan" };
 const badge = { accepted: "bg-blue-50 text-blue-700", delivered: "bg-emerald-50 text-emerald-700", completed: "bg-emerald-50 text-emerald-700", failed: "bg-red-50 text-red-700", cancelled: "bg-red-50 text-red-700" };
@@ -11,6 +15,9 @@ function SupplierPurchaseOrder() {
   const [selected, setSelected] = useState(null);
   const [error, setError] = useState("");
   const [statusLoading, setStatusLoading] = useState(false);
+  const [dates, setDates] = useState(null);
+  const [estimateOnly, setEstimateOnly] = useState(false);
+  const user = AuthService.getUser();
 
   const load = async () => {
     try {
@@ -24,6 +31,7 @@ function SupplierPurchaseOrder() {
   }, []);
 
   const open = async (order) => {
+    setDates(null);
     try {
       const data = await PurchaseOrderService.getById(order.purchase_order_id);
       setSelected(data?.data || data);
@@ -31,16 +39,21 @@ function SupplierPurchaseOrder() {
     } catch (e) { setError(e.message || "Gagal memuat detail PO."); }
   };
 
-  const markAsShipped = async () => {
+  const markAsShipped = async event => {
+    event.preventDefault();
     setStatusLoading(true);
     setError("");
     try {
-      await PurchaseOrderService.updateStatus(selected.purchase_order_id, "shipping");
+      if (!isOwner(selected, user)) throw new Error("Anda bukan pemilik PO ini.");
+      const payload = shippingPayload(selected, dates, estimateOnly);
+      if (estimateOnly) await PurchaseOrderService.updateDeliveryEstimate(selected.purchase_order_id, payload);
+      else await PurchaseOrderService.updateStatus(selected.purchase_order_id, "shipping", payload);
+      setDates(null);
       await load();
       const data = await PurchaseOrderService.getById(selected.purchase_order_id);
       setSelected(data?.data || data);
     } catch (e) {
-      setError(e?.data?.message || e.message || "Gagal mengubah status PO.");
+      setError([e.message, ...Object.values(e?.data?.errors || {}).flat()].filter(Boolean).join(" "));
     } finally {
       setStatusLoading(false);
     }
@@ -49,10 +62,20 @@ function SupplierPurchaseOrder() {
   if (selected) {
     const details = selected.purchase_order_detail_purchase_order || selected.detail_purchase_orders || selected.details || [];
     return <section className="space-y-5">
-      <div className="flex items-center gap-3"><button onClick={() => setSelected(null)} className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"><ArrowLeft size={17} /></button><div><p className="text-sm font-medium text-blue-600">Supplier</p><h1 className="mt-1 text-2xl font-bold">Detail Purchase Order</h1></div></div>
+      <div className="flex items-center gap-3"><button onClick={() => { setSelected(null); setDates(null); }} className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"><ArrowLeft size={17} /></button><div><p className="text-sm font-medium text-blue-600">Supplier</p><h1 className="mt-1 text-2xl font-bold">Detail Purchase Order</h1></div></div>
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><div className="grid grid-cols-1 gap-5 md:grid-cols-3"><Info label="No. PO" value={selected.po_number} strong /><Info label="Purchase Request" value={selected.purchase_order_purchase_request?.request_number || selected.purchase_request_id || "-"} /><Info label="Tanggal Order" value={selected.order_date} /><Info label="Estimasi Tiba" value={selected.expected_delivery_date || "-"} /><div><p className="text-xs text-slate-500">Status</p><span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${badge[selected.status] || "bg-slate-100 text-slate-600"}`}>{labels[selected.status] || selected.status}</span></div><Info label="Pembayaran" value={selected.payment_status || "unpaid"} /></div><div className="mt-5 rounded-lg bg-slate-50 p-4 text-sm text-slate-600">{selected.notes || "Tidak ada catatan."}</div>{["draft", "sent", "accepted"].includes(selected.status) && <button disabled={statusLoading} onClick={markAsShipped} className="mt-5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{statusLoading ? "Memproses..." : "Tandai PO Dikirim"}</button>}</div>
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="mb-4 text-sm font-semibold">Detail Barang</h2><div className="overflow-hidden rounded-lg border border-slate-200"><div className="overflow-x-auto"><table className="w-full min-w-[700px]"><thead className="bg-slate-50"><tr>{["Barang", "Qty", "Harga", "Diskon", "Subtotal"].map((title, index) => <th key={title} className={`px-4 py-3 text-xs text-slate-500 ${index > 1 ? "text-right" : index === 1 ? "text-center" : "text-left"}`}>{title}</th>)}</tr></thead><tbody>{details.map((detail, index) => <tr key={detail.detail_purchase_order_id || index} className="border-t border-slate-100"><td className="px-4 py-3 text-sm">{detail.detail_purchase_order_item?.item_name || detail.item?.item_name || detail.item_id}</td><td className="px-4 py-3 text-center text-sm">{detail.quantity}</td><td className="px-4 py-3 text-right text-sm">{rupiah(detail.unit_price)}</td><td className="px-4 py-3 text-right text-sm">{detail.discount_percentage || 0}%</td><td className="px-4 py-3 text-right text-sm font-medium">{rupiah(detail.subtotal)}</td></tr>)}</tbody></table></div></div><div className="ml-auto mt-5 max-w-sm space-y-2 border-t border-slate-200 pt-4"><div className="flex justify-between text-sm"><span>Subtotal</span><b>{rupiah(selected.subtotal)}</b></div><div className="flex justify-between text-sm"><span>Diskon</span><b>{rupiah(selected.discount_amount)}</b></div><div className="flex justify-between border-t border-slate-200 pt-3 text-base font-bold"><span>Total</span><span>{rupiah(selected.total)}</span></div></div></div>
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><div className="grid grid-cols-1 gap-5 md:grid-cols-3"><Info label="No. PO" value={selected.po_number} strong /><Info label="Purchase Request" value={selected.purchase_order_purchase_request?.request_number || selected.purchase_request_id || "-"} /><Info label="Tanggal Order" value={selected.order_date} /><Info label="Tanggal Pengiriman" value={selected.shipping_date?.slice(0, 10) || "-"} /><Info label="Estimasi Tiba" value={selected.expected_delivery_date || "-"} /><div><p className="text-xs text-slate-500">Status</p><span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${badge[selected.status] || "bg-slate-100 text-slate-600"}`}>{labels[selected.status] || selected.status}</span></div><Info label="Pembayaran" value={selected.payment_status || "unpaid"} /></div><div className="mt-5 rounded-lg bg-slate-50 p-4 text-sm text-slate-600">{selected.notes || "Tidak ada catatan."}</div>{isOwner(selected, user) && ["draft", "sent", "accepted"].includes(selected.status) && <button disabled={statusLoading} onClick={() => { setEstimateOnly(false); setError(""); setDates({ shipping_date: localDate(), expected_delivery_date: "" }); }} className="mt-5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{statusLoading ? "Memproses..." : "Tandai PO Dikirim"}</button>}</div>
+
+      {isOwner(selected, user) && selected.status === "shipping" && selected.shipping_date && <button className="rounded-lg bg-blue-50 px-4 py-2 text-blue-700" onClick={() => { setEstimateOnly(true); setError(""); setDates({ expected_delivery_date: dateOnly(selected.expected_delivery_date) }); }}>Ubah estimasi tiba</button>}
+      {selected.status === "shipping" && !selected.shipping_date && <p className="text-sm text-amber-700">PO historis belum memiliki tanggal kirim. Perubahan estimasi memerlukan rekonsiliasi data.</p>}
+      {dates && <form onSubmit={markAsShipped} className="space-y-4 rounded-xl border bg-white p-5">
+        <h2 className="font-bold">{estimateOnly ? "Ubah estimasi tiba" : "Kirim barang"}</h2><ErrorDetails error={error} />
+        {!estimateOnly && <label className="block">Tanggal pengiriman aktual<input required type="date" min={dateOnly(selected.order_date)} max={localDate()} value={dates.shipping_date} onChange={e => setDates({ ...dates, shipping_date: e.target.value })} className="ml-3 rounded border p-2" /></label>}
+        <label className="block">Estimasi tiba<input required type="date" min={estimateOnly ? dateOnly(selected.shipping_date) : dates.shipping_date} value={dates.expected_delivery_date} onChange={e => setDates({ ...dates, expected_delivery_date: e.target.value })} className="ml-3 rounded border p-2" /></label>
+        <button disabled={statusLoading} type="button" onClick={() => setDates(null)} className="mr-3 rounded border px-4 py-2">Batal</button>
+        <button disabled={statusLoading} className="rounded bg-blue-600 px-4 py-2 text-white">{statusLoading ? "Menyimpan..." : "Simpan"}</button>
+      </form>}
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="mb-4 text-sm font-semibold">Detail Barang</h2><div className="overflow-hidden rounded-lg border border-slate-200"><div className="overflow-x-auto"><PackagingTable lines={details} /></div></div><div className="ml-auto mt-5 max-w-sm space-y-2 border-t border-slate-200 pt-4"><div className="flex justify-between text-sm"><span>Subtotal</span><b>{rupiah(selected.subtotal)}</b></div><div className="flex justify-between text-sm"><span>Diskon</span><b>{rupiah(selected.discount_amount)}</b></div><div className="flex justify-between border-t border-slate-200 pt-3 text-base font-bold"><span>Total</span><span>{rupiah(selected.total)}</span></div></div></div>
     </section>;
   }
 
