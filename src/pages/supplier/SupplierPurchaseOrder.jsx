@@ -99,9 +99,7 @@ function SupplierPurchaseOrder() {
         </div>
         <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4 sm:px-6"><button disabled={statusLoading} type="button" onClick={() => setDates(null)} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50">Batal</button><button disabled={statusLoading} className="rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100 disabled:opacity-50">{statusLoading ? "Menyimpan..." : "Simpan"}</button></div>
       </form>}
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="mb-4 text-sm font-semibold">Detail Barang</h2><div className="overflow-hidden rounded-lg border border-slate-200"><div className="overflow-x-auto"><PackagingTable lines={details} /></div></div><div className="ml-auto mt-5 max-w-sm space-y-2 border-t border-slate-200 pt-4"><div className="flex justify-between text-sm"><span>Subtotal</span><b>{rupiah(selected.subtotal)}</b></div><div className="flex justify-between text-sm"><span>Diskon</span><b>{rupiah(selected.discount_amount)}</b></div><div className="flex justify-between border-t border-slate-200 pt-3 text-base font-bold"><span>Total</span><span>{rupiah(selected.total)}</span></div></div></div>
-      {isOwner(selected, user) && <SupplierPayments key={selected.purchase_order_id} purchaseOrderId={selected.purchase_order_id} purchaseOrder={selected} />}
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="mb-4"><h2 className="text-[15px] font-bold text-slate-800">Detail Barang</h2><p className="mt-1 text-xs text-slate-500">Rincian barang dan nilai akhir purchase order.</p></div>
         <div className="overflow-hidden rounded-lg border border-slate-200"><div className="overflow-x-auto"><PackagingTable lines={details} /></div></div>
         <div className="ml-auto mt-5 max-w-md overflow-hidden rounded-xl border border-blue-100 bg-white shadow-sm">
@@ -112,6 +110,8 @@ function SupplierPurchaseOrder() {
           <div className="flex items-center justify-between gap-5 bg-gradient-to-r from-blue-600 to-blue-700 px-5 py-4 text-white"><span className="text-sm font-semibold text-blue-50">Total akhir</span><span className="text-base font-bold tabular-nums text-white">{rupiah(selected.total)}</span></div>
         </div>
       </div>
+      {isOwner(selected, user) && <SupplierPayments key={selected.purchase_order_id} purchaseOrderId={selected.purchase_order_id} purchaseOrder={selected} />}
+
     </section>;
   }
 
