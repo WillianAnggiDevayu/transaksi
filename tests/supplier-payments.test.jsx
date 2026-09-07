@@ -1,0 +1,40 @@
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+vi.mock("../src/services/PaymentService", () => ({ default: { getByPurchaseOrderWithSummary: vi.fn(), getById: vi.fn() } }));
+import PaymentService from "../src/services/PaymentService";
+import SupplierPayments from "../src/pages/supplier/SupplierPayments";
+beforeEach(() => vi.resetAllMocks());
+afterEach(cleanup);
+it.each([["0.00", "100000.00", "Belum Dibayar"], ["40000.00", "60000.00", "Dibayar Sebagian"], ["100000.00", "0.00", "Lunas"]])("shows confirmed %s and remaining %s as %s", async (confirmed, remaining, status) => {
+  PaymentService.getByPurchaseOrderWithSummary.mockResolvedValue({ payments: [{ payment_id: "p1", payment_number: "PAY-1", status: "draft", amount: "100.00", payment_method: "cash" }], summary: { total_amount: "100000.00", confirmed_amount: confirmed, remaining_amount: remaining } });
+  render(<SupplierPayments purchaseOrderId="po1" />);
+  await screen.findByText(status);
+  expect(PaymentService.getByPurchaseOrderWithSummary).toHaveBeenCalledWith("po1");
+  expect(screen.getByText("PAY-1")).toBeTruthy();
+  expect(screen.getByText("Draft")).toBeTruthy();
+  expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual(["Detail"]);
+});
+it.each(["draft", "waiting_confirmation", "confirmed", "rejected"])("opens %s payment details without mutation controls", async (status) => {
+  const payment = { payment_id: "p1", payment_number: "PAY-1", purchase_order_id: "po1", amount: "100.00", status, notes: "Pembayaran pertama" };
+  PaymentService.getByPurchaseOrderWithSummary.mockResolvedValue({ payments: [payment], summary: { total_amount: "100.00", confirmed_amount: "0.00", remaining_amount: "100.00" } });
+  PaymentService.getById.mockResolvedValue(payment);
+  render(<SupplierPayments purchaseOrderId="po1" />);
+  fireEvent.click(await screen.findByText("Detail"));
+  await screen.findByText("Pembayaran pertama");
+  await waitFor(() => expect(screen.getByText("Kembali").disabled).toBe(false));
+  expect(PaymentService.getById).toHaveBeenCalledWith("p1");
+  expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual(["Kembali"]);
+  fireEvent.click(screen.getByText("Kembali"));
+  await screen.findByText("Detail");
+  expect(screen.queryByText("Buat Pembayaran")).toBeNull();
+});
+it("shows fetch errors instead of assuming unpaid and allows retry", async () => {
+  PaymentService.getByPurchaseOrderWithSummary.mockRejectedValueOnce(new Error("Akses ditolak"));
+  render(<SupplierPayments purchaseOrderId="po1" />);
+  await screen.findByRole("alert");
+  expect(screen.queryByText("Belum Dibayar")).toBeNull();
+  PaymentService.getByPurchaseOrderWithSummary.mockResolvedValue({ payments: [], summary: { total_amount: "100.00", confirmed_amount: "0.00", remaining_amount: "100.00" } });
+  fireEvent.click(screen.getByText("Muat Ulang Pembayaran"));
+  await screen.findByText("Belum ada pembayaran.");
+  expect(screen.getByText("Belum Dibayar")).toBeTruthy();
+});

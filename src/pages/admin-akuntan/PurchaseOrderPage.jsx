@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Eye } from "lucide-react";
 import PurchaseOrderService from "../../services/PurchaseOrderService";
 import { PackagingTable } from "../../components/ProcurementDetails";
@@ -12,6 +12,11 @@ function PurchaseOrderPage() {
   const [selected, setSelected] = useState(null);
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
+  const [paymentStatuses, setPaymentStatuses] = useState({});
+  const updatePaymentSummary = useCallback((id, summary) => {
+    const status = Number(summary.confirmed_amount) <= 0 ? "unpaid" : Number(summary.remaining_amount) <= 0 ? "paid" : "partially_paid";
+    setPaymentStatuses((current) => current[id] === status ? current : { ...current, [id]: status });
+  }, []);
 
   const load = async () => {
     try {
@@ -51,9 +56,9 @@ function PurchaseOrderPage() {
     return <section className="space-y-5">
       <div className="flex items-center justify-between"><div><p className="text-sm font-medium text-blue-600">Purchase Order</p><h1 className="mt-1 text-2xl font-bold">{selected.po_number}</h1></div><button onClick={() => setSelected(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm hover:bg-slate-50">Kembali</button></div>
       {error && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><div className="grid gap-5 md:grid-cols-3"><Info label="Supplier" value={selected.purchase_order_supplier?.supplier_name || "-"} /><Info label="Tanggal" value={selected.order_date} /><Info label="Status" value={labels[selected.status] || selected.status} strong /><Info label="Total" value={rupiah(selected.total)} strong /><Info label="Pembayaran" value={selected.payment_status || "unpaid"} /><Info label="Tanggal Pengiriman" value={selected.shipping_date?.slice(0, 10) || "-"} /><Info label="Estimasi Tiba" value={selected.expected_delivery_date || "-"} /></div>{selected.status === "shipping" && <button onClick={() => updateStatus(selected)} className="mt-6 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">Tandai Barang Sampai</button>}</div>
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><div className="grid gap-5 md:grid-cols-3"><Info label="Supplier" value={selected.purchase_order_supplier?.supplier_name || "-"} /><Info label="Tanggal" value={selected.order_date} /><Info label="Status" value={labels[selected.status] || selected.status} strong /><Info label="Total" value={rupiah(selected.total)} strong /><Info label="Pembayaran" value={paymentStatuses[selected.purchase_order_id] || selected.payment_status || "unpaid"} /><Info label="Tanggal Pengiriman" value={selected.shipping_date?.slice(0, 10) || "-"} /><Info label="Estimasi Tiba" value={selected.expected_delivery_date || "-"} /></div>{selected.status === "shipping" && <button onClick={() => updateStatus(selected)} className="mt-6 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">Tandai Barang Sampai</button>}</div>
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="mb-4 text-sm font-semibold">Detail Barang</h2><div className="overflow-x-auto"><PackagingTable lines={details} /></div></div>
-      <PaymentPage key={selected.purchase_order_id} purchaseOrder={selected} />
+      <PaymentPage key={selected.purchase_order_id} purchaseOrder={selected} onPaymentSummary={updatePaymentSummary} />
     </section>;
   }
 
