@@ -13,8 +13,7 @@ export function canEditQuotation(q, today = localDate()) {
 }
 export function newLine(pr) {
   return { clientId: crypto.randomUUID(), detail_purchase_request_id: pr.detail_purchase_request_id,
-    unit_id: pr.base_unit_id || baseUnit(pr).unit_id || "", quantity: pr.quantity,
-    conversion_qty: 1, unit_price: "", discount_percentage: 0 };
+    unit_id: "", quantity: 0, conversion_qty: 0, unit_price: 0, discount_percentage: 0 };
 }
 export function linePayload(line) {
   return { detail_purchase_request_id: line.detail_purchase_request_id, unit_id: line.unit_id,
