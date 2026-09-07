@@ -58,7 +58,7 @@ export function shippingPayload(po, dates, estimateOnly = false, today = localDa
   const shipping = estimateOnly ? dateOnly(po.shipping_date) : dates.shipping_date;
   const estimate = dates.expected_delivery_date;
   const valid = d => /^\d{4}-\d{2}-\d{2}$/.test(d || "") && !Number.isNaN(Date.parse(d)) && new Date(d).toISOString().slice(0, 10) === d;
-  if (!valid(shipping) || (!estimateOnly && (shipping < dateOnly(po.order_date) || shipping > today))) throw new Error("Tanggal kirim harus antara tanggal PO dan hari ini.");
+  if (!valid(shipping) || (!estimateOnly && (shipping !== today || shipping < dateOnly(po.order_date)))) throw new Error("Tanggal pengiriman aktual harus hari ini dan tidak boleh sebelum tanggal PO.");
   if (!valid(estimate) || estimate < shipping) throw new Error("Estimasi tiba harus sama dengan atau setelah tanggal kirim.");
   return estimateOnly ? { expected_delivery_date: estimate } : { status: "shipping", shipping_date: shipping, expected_delivery_date: estimate };
 }
