@@ -129,12 +129,15 @@ class ApiClient {
     const headers = this.buildHeaders(options);
     const method = (options.method || "GET").toUpperCase();
     const isMutating = method !== "GET";
+    const isAuthenticationRequest = ["/login", "/logout"].includes(path);
+    const authenticationError = () => new Error("Tidak dapat terhubung ke server autentikasi. Periksa koneksi internet dan konfigurasi CORS backend.");
     const onlineOnly = requiresOnline(path, method);
     const offlineError = () => new Error("Transaksi ini memerlukan koneksi online. Isian tetap tersimpan di form; periksa data server sebelum mencoba lagi.");
 
     // Jika browser sudah tahu sedang offline, langsung antre tanpa
     // menunggu fetch timeout.
     if (isMutating && typeof navigator !== "undefined" && navigator.onLine === false) {
+      if (isAuthenticationRequest) throw authenticationError();
       if (onlineOnly) throw offlineError();
       return this.queueMutation(path, options);
     }
@@ -143,6 +146,7 @@ class ApiClient {
       return await this.performFetch(path, options, headers);
     } catch (err) {
       if (isMutating && this.isNetworkError(err)) {
+        if (isAuthenticationRequest) throw authenticationError();
         if (onlineOnly) throw offlineError();
         return this.queueMutation(path, options);
       }
@@ -197,6 +201,11 @@ class ApiClient {
     let failed = 0;
 
     for (const item of queue) {
+      // Jangan kirim ulang autentikasi yang tersimpan oleh versi lama.
+      if (["/login", "/logout"].includes(item.path)) {
+        await OfflineQueue.removeFromQueue(item.id);
+        continue;
+      }
       if (requiresOnline(item.path, item.method)) continue;
       try {
         const headers = this.buildHeaders({

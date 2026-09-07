@@ -14,8 +14,30 @@ npm run build
 ```
 
 Hasil deploy ada di folder `dist/`, termasuk service worker dan manifest PWA.
-Periksa secara lokal dengan `npm run preview`, lalu buka `http://localhost:5173`.
+Periksa secara lokal dengan `npm run preview`, lalu buka `http://localhost:4173`.
 Preview hanya untuk pemeriksaan lokal; production dilayani hosting statis.
+
+## Development dan cache browser
+
+Jalankan `npm run dev` dan buka URL yang tercetak di terminal (default
+`http://localhost:5173`). Preview memakai port 4173 agar service worker PWA
+tidak berbagi origin dengan server development. Service worker dinonaktifkan
+untuk development, tetapi registrasi lama di browser bisa tetap aktif.
+
+Jika window biasa mengalami `504 (Outdated Optimize Dep)` atau WebSocket Vite
+gagal sementara incognito bekerja:
+
+1. Pada tab `localhost:5173`, buka DevTools → Application → Service Workers,
+   lalu unregister service worker untuk origin tersebut jika ada.
+2. Di Application → Cache Storage, hapus cache untuk origin tersebut.
+   Biarkan Local Storage dan IndexedDB agar sesi dan antrean offline tetap tersimpan.
+3. Hentikan server development dengan Ctrl+C, lalu jalankan `npm run dev -- --force`
+   untuk membangun ulang cache dependency Vite.
+4. Buka URL dari terminal. Pada tab Network DevTools, centang Disable cache,
+   lalu reload halaman dengan DevTools tetap terbuka.
+
+Pesan font dengan URL `chrome-extension://` berasal dari ekstensi browser.
+HTTP 500 dari endpoint API perlu ditelusuri melalui response API dan log backend.
 
 ## API
 
