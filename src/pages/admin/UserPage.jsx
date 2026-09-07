@@ -15,13 +15,14 @@ const EMPTY_FORM = {
 const ROLE_OPTIONS = [
   { value: "admin", label: "Admin" },
   { value: "akuntan", label: "Akuntan" },
-  // { value: "supplier", label: "Supplier" },
 ];
 
 function UserPage({ currentUser }) {
   const { data: usersData, loading } = useCachedList("users", UserService);
   const users = useMemo(
-    () => (Array.isArray(usersData) ? usersData : []),
+    () => (Array.isArray(usersData) ? usersData : []).filter((user) =>
+      ROLE_OPTIONS.some((role) => role.value === user.role)
+    ),
     [usersData]
   );
 
@@ -140,7 +141,7 @@ function UserPage({ currentUser }) {
           <p className="text-sm font-medium text-blue-600">Master Data</p>
           <h1 className="mt-1 text-2xl font-bold text-slate-900">User</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Kelola akun admin, akuntan, dan supplier.
+            Kelola akun admin dan akuntan.
           </p>
         </div>
 
