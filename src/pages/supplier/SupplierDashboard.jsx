@@ -220,7 +220,7 @@ function SupplierDashboard({ onNavigate }) {
 
         {/* REQUEST BARU */}
 
-        <div className="rounded-[13px] border border-gray-200 bg-white p-[20px] shadow-[0_3px_10px_rgba(15,23,42,0.02)]">
+        <button type="button" onClick={() => onNavigate?.("requestOrder")} className="group w-full rounded-[13px] border border-gray-200 bg-white p-[20px] text-left shadow-[0_3px_10px_rgba(15,23,42,0.02)] transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500/30">
           <div className="flex items-start justify-between">
             <div>
               <p className="text-[12px] text-slate-500">
@@ -242,11 +242,11 @@ function SupplierDashboard({ onNavigate }) {
 
           </div>
 
-        </div>
+        </button>
 
         {/* MENUNGGU PENAWARAN */}
 
-        <div className="rounded-[13px] border border-gray-200 bg-white p-[20px] shadow-[0_3px_10px_rgba(15,23,42,0.02)]">
+        <button type="button" onClick={() => onNavigate?.("requestOrder")} className="group w-full rounded-[13px] border border-gray-200 bg-white p-[20px] text-left shadow-[0_3px_10px_rgba(15,23,42,0.02)] transition hover:-translate-y-0.5 hover:border-amber-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-amber-500/30">
 
           <div className="flex items-start justify-between">
 
@@ -270,11 +270,11 @@ function SupplierDashboard({ onNavigate }) {
 
           </div>
 
-        </div>
+        </button>
 
         {/* TOTAL PO */}
 
-        <div className="rounded-[13px] border border-gray-200 bg-white p-[20px] shadow-[0_3px_10px_rgba(15,23,42,0.02)]">
+        <button type="button" onClick={() => onNavigate?.("purchaseOrder")} className="group w-full rounded-[13px] border border-gray-200 bg-white p-[20px] text-left shadow-[0_3px_10px_rgba(15,23,42,0.02)] transition hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-violet-500/30">
 
           <div className="flex items-start justify-between">
 
@@ -298,11 +298,11 @@ function SupplierDashboard({ onNavigate }) {
 
           </div>
 
-        </div>
+        </button>
 
         {/* PO SELESAI */}
 
-        <div className="rounded-[13px] border border-gray-200 bg-white p-[20px] shadow-[0_3px_10px_rgba(15,23,42,0.02)]">
+        <button type="button" onClick={() => onNavigate?.("purchaseOrder")} className="group w-full rounded-[13px] border border-gray-200 bg-white p-[20px] text-left shadow-[0_3px_10px_rgba(15,23,42,0.02)] transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-500/30">
 
           <div className="flex items-start justify-between">
 
@@ -326,7 +326,7 @@ function SupplierDashboard({ onNavigate }) {
 
           </div>
 
-        </div>
+        </button>
 
       </div>
 
@@ -417,7 +417,7 @@ function SupplierDashboard({ onNavigate }) {
 
           {/* PO SELESAI */}
 
-          <div className="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3">
+          <button type="button" onClick={() => onNavigate?.("purchaseOrder")} className="flex w-full items-center justify-between rounded-lg border border-gray-200 px-4 py-3 text-left transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
 
             <div className="flex items-center gap-3">
 
@@ -443,7 +443,7 @@ function SupplierDashboard({ onNavigate }) {
               Selesai
             </span>
 
-          </div>
+          </button>
 
         </div>
 
@@ -478,9 +478,11 @@ function SupplierDashboard({ onNavigate }) {
 
             {latestRequestOrders.map((item) => (
 
-              <div
+              <button
+                type="button"
                 key={item.request_supplier_id}
-                className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-3 transition hover:bg-slate-50"
+                onClick={() => onNavigate?.("requestOrder")}
+                className="flex w-full items-center justify-between rounded-lg border border-gray-100 px-3 py-3 text-left transition hover:border-blue-100 hover:bg-blue-50/40 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               >
 
                 <div>
@@ -512,7 +514,7 @@ function SupplierDashboard({ onNavigate }) {
 
                 </div>
 
-              </div>
+              </button>
 
             ))}
 
@@ -553,9 +555,11 @@ function SupplierDashboard({ onNavigate }) {
 
             {latestPurchaseOrders.map((item) => (
 
-              <div
+              <button
+                type="button"
                 key={item.purchase_order_id}
-                className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-3 transition hover:bg-slate-50"
+                onClick={() => onNavigate?.("purchaseOrder")}
+                className="flex w-full items-center justify-between rounded-lg border border-gray-100 px-3 py-3 text-left transition hover:border-blue-100 hover:bg-blue-50/40 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               >
 
                 <div>
@@ -595,7 +599,7 @@ function SupplierDashboard({ onNavigate }) {
 
                 </div>
 
-              </div>
+              </button>
 
             ))}
 
