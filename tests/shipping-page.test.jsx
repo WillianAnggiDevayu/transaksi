@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 vi.mock("../src/services/PurchaseOrderService", () => ({ default: { getAll: vi.fn(), getById: vi.fn(), updateStatus: vi.fn(), updateDeliveryEstimate: vi.fn() } }));
 vi.mock("../src/services/AuthService", () => ({ default: { getUser: () => ({ id: "owner", role: "supplier" }) } }));
-vi.mock("../src/services/PaymentService", () => ({ default: { getByPurchaseOrderWithSummary: vi.fn().mockResolvedValue({ payments: [], summary: { total_amount: "100.00", confirmed_amount: "0.00", remaining_amount: "100.00" } }) } }));
+vi.mock("../src/services/PaymentService", async (importOriginal) => ({ default: { getOverview: (await importOriginal()).default.getOverview, getByPurchaseOrderWithSummary: vi.fn().mockResolvedValue({ payments: [], summary: { total_amount: "100.00", confirmed_amount: "0.00", remaining_amount: "100.00" } }) } }));
 import Service from "../src/services/PurchaseOrderService";
 import SupplierPurchaseOrder from "../src/pages/supplier/SupplierPurchaseOrder";
 import { localDate } from "../src/utils/procurement";

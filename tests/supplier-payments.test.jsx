@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-vi.mock("../src/services/PaymentService", () => ({ default: { getByPurchaseOrderWithSummary: vi.fn(), getById: vi.fn() } }));
+vi.mock("../src/services/PaymentService", async (importOriginal) => ({ default: { getOverview: (await importOriginal()).default.getOverview, getByPurchaseOrderWithSummary: vi.fn(), getById: vi.fn() } }));
 import PaymentService from "../src/services/PaymentService";
 import SupplierPayments from "../src/pages/supplier/SupplierPayments";
 beforeEach(() => vi.resetAllMocks());
@@ -9,7 +9,7 @@ it.each([["0.00", "100000.00", "Belum Dibayar"], ["40000.00", "60000.00", "Dibay
   PaymentService.getByPurchaseOrderWithSummary.mockResolvedValue({ payments: [{ payment_id: "p1", payment_number: "PAY-1", status: "draft", amount: "100.00", payment_method: "cash" }], summary: { total_amount: "100000.00", confirmed_amount: confirmed, remaining_amount: remaining } });
   render(<SupplierPayments purchaseOrderId="po1" />);
   await screen.findByText(status);
-  expect(PaymentService.getByPurchaseOrderWithSummary).toHaveBeenCalledWith("po1");
+  expect(PaymentService.getByPurchaseOrderWithSummary).toHaveBeenCalledWith("po1", expect.objectContaining({ force: true }));
   expect(screen.getByText("PAY-1")).toBeTruthy();
   expect(screen.getByText("Draft")).toBeTruthy();
   expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual(["Detail"]);
@@ -22,7 +22,7 @@ it.each(["draft", "waiting_confirmation", "confirmed", "rejected"])("opens %s pa
   fireEvent.click(await screen.findByText("Detail"));
   await screen.findByText("Pembayaran pertama");
   await waitFor(() => expect(screen.getByText("Kembali").disabled).toBe(false));
-  expect(PaymentService.getById).toHaveBeenCalledWith("p1");
+  expect(PaymentService.getById).toHaveBeenCalledWith("p1", expect.objectContaining({ force: true, cache: false }));
   expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual(["Kembali"]);
   fireEvent.click(screen.getByText("Kembali"));
   await screen.findByText("Detail");

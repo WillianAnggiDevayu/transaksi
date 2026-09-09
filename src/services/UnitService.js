@@ -1,28 +1,15 @@
 import ApiClient from "./ApiClient";
-import CacheStore from "./CacheStore";
+import { readList, readDetail } from "./CachedResource";
 
 const CACHE_KEY = "units";
 
 class UnitService {
-    async getAll() {
-        if (CacheStore.has(CACHE_KEY)) {
-            return CacheStore.get(CACHE_KEY);
-        }
-
-        const response = await ApiClient.get("/units");
-        const result = response?.data || response;
-
-        const data = Array.isArray(result) ? result : [];
-
-        CacheStore.set(CACHE_KEY, data);
-
-        return data;
+    async getAll(options = {}) {
+        return readList(CACHE_KEY, "/units", options);
     }
 
-    async getById(id) {
-        const response = await ApiClient.get(`/units/${id}`);
-
-        return response?.data || response;
+    async getById(id, options = {}) {
+        return readDetail(`units:${id}`, `/units/${id}`, options);
     }
 
     async create(payload) {
@@ -30,8 +17,6 @@ class UnitService {
             "/units",
             payload
         );
-
-        CacheStore.clear(CACHE_KEY);
 
         return result;
     }
@@ -42,8 +27,6 @@ class UnitService {
             payload
         );
 
-        CacheStore.clear(CACHE_KEY);
-
         return result;
     }
 
@@ -51,8 +34,6 @@ class UnitService {
         const result = await ApiClient.delete(
             `/units/${id}`
         );
-
-        CacheStore.clear(CACHE_KEY);
 
         return result;
     }

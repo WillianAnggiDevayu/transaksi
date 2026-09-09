@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
+import useCachedList from "../../hooks/useCachedList";
 import {
   ClipboardList,
   FileText,
@@ -89,38 +90,13 @@ const getPOStatusLabel = (status) => {
 };
 
 function SupplierDashboard({ onNavigate }) {
-  const [requestOrders, setRequestOrders] = useState([]);
-  const [purchaseOrders, setPurchaseOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  const load = async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      const [requests, orders] = await Promise.all([
-        SupplierQuotationService.getAll(),
-        PurchaseOrderService.getAll(),
-      ]);
-
-      setRequestOrders(Array.isArray(requests) ? requests : []);
-      setPurchaseOrders(Array.isArray(orders) ? orders : []);
-    } catch (err) {
-      setError(
-        err?.data?.message ||
-        err.message ||
-        "Gagal memuat data dashboard supplier."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    const loadTimer = window.setTimeout(load, 0);
-    return () => window.clearTimeout(loadTimer);
-  }, []);
+  const requests = useCachedList("supplier-quotations", SupplierQuotationService);
+  const orders = useCachedList("purchase-orders", PurchaseOrderService);
+  const requestOrders = requests.data;
+  const purchaseOrders = orders.data;
+  const loading = requests.loading || orders.loading;
+  const error = requests.error?.message || orders.error?.message || "";
+  const displayCount = (resource, value) => resource.loading ? "—" : resource.error ? "Tidak tersedia" : value;
 
   // PERHITUNGAN DASHBOARD
   const requestBaru = useMemo(
@@ -228,7 +204,7 @@ function SupplierDashboard({ onNavigate }) {
               </p>
 
               <h2 className="mt-1 text-[23px] font-semibold text-slate-900">
-                {requestBaru}
+                {displayCount(requests, requestBaru)}
               </h2>
 
               <p className="mt-1 text-[11px] text-slate-400">
@@ -256,7 +232,7 @@ function SupplierDashboard({ onNavigate }) {
               </p>
 
               <h2 className="mt-1 text-[23px] font-semibold text-slate-900">
-                {menungguPenawaran}
+                {displayCount(requests, menungguPenawaran)}
               </h2>
 
               <p className="mt-1 text-[11px] text-slate-400">
@@ -284,7 +260,7 @@ function SupplierDashboard({ onNavigate }) {
               </p>
 
               <h2 className="mt-1 text-[23px] font-semibold text-slate-900">
-                {totalPO}
+                {displayCount(orders, totalPO)}
               </h2>
 
               <p className="mt-1 text-[11px] text-slate-400">
@@ -312,7 +288,7 @@ function SupplierDashboard({ onNavigate }) {
               </p>
 
               <h2 className="mt-1 text-[23px] font-semibold text-slate-900">
-                {poSelesai}
+                {displayCount(orders, poSelesai)}
               </h2>
 
               <p className="mt-1 text-[11px] text-slate-400">
@@ -368,7 +344,7 @@ function SupplierDashboard({ onNavigate }) {
                 </p>
 
                 <p className="mt-0.5 text-[11px] text-slate-400">
-                  {menungguPenawaran} request
+                  {displayCount(requests, menungguPenawaran)} request
                 </p>
 
               </div>
@@ -402,7 +378,7 @@ function SupplierDashboard({ onNavigate }) {
                 </p>
 
                 <p className="mt-0.5 text-[11px] text-slate-400">
-                  {poPending} purchase order
+                  {displayCount(orders, poPending)} purchase order
                 </p>
 
               </div>
@@ -432,7 +408,7 @@ function SupplierDashboard({ onNavigate }) {
                 </p>
 
                 <p className="mt-0.5 text-[11px] text-slate-400">
-                  {poSelesai} purchase order
+                  {displayCount(orders, poSelesai)} purchase order
                 </p>
 
               </div>

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 vi.mock("../src/services/PurchaseOrderService", () => ({ default: { getAll: vi.fn() } }));
-vi.mock("../src/services/PaymentService", () => ({ default: { getByPurchaseOrderWithSummary: vi.fn(), getById: vi.fn(), create: vi.fn(), delete: vi.fn(), confirm: vi.fn() } }));
+vi.mock("../src/services/PaymentService", async (importOriginal) => ({ default: { getOverview: (await importOriginal()).default.getOverview, getByPurchaseOrderWithSummary: vi.fn(), getById: vi.fn(), create: vi.fn(), delete: vi.fn(), confirm: vi.fn() } }));
 vi.mock("../src/services/ConfirmationService", () => ({ confirmAction: vi.fn() }));
 import PurchaseOrderService from "../src/services/PurchaseOrderService";
 import PaymentService from "../src/services/PaymentService";
@@ -11,6 +11,11 @@ import PaymentPage from "../src/pages/admin-akuntan/PaymentPage";
 const order = { purchase_order_id: "po1", po_number: "PO-1", status: "draft", total: "100000.00" };
 const summary = { total_amount: "100000.00", confirmed_amount: "40000.00", remaining_amount: "60000.00" };
 const payment = { payment_id: "pay1", payment_number: "PAY-1", purchase_order_id: "po1", status: "draft", amount: "60000.00" };
+const deferred = () => {
+  let resolve;
+  const promise = new Promise((yes) => { resolve = yes; });
+  return { promise, resolve };
+};
 beforeEach(() => {
   vi.resetAllMocks();
   PurchaseOrderService.getAll.mockResolvedValue([order, { ...order, purchase_order_id: "po2", po_number: "PO-2" }]);
@@ -23,6 +28,41 @@ async function openForm() {
   await waitFor(() => expect(screen.getByText("Buat Pembayaran").disabled).toBe(false));
   fireEvent.click(screen.getByText("Buat Pembayaran"));
 }
+
+it("presents payment details with readable metadata and a separate PO summary", async () => {
+  const longNumber = `PAY-${"1234567890".repeat(8)}`;
+  PaymentService.getById.mockResolvedValue({ ...payment, payment_number: longNumber, payment_method: "bank_transfer", payment_date: "2026-09-09T00:00:00Z", amount: "1234567890123.45", notes: "Pembayaran termin pertama\nReferensi bank: ABC-123" });
+  render(<PaymentPage purchaseOrder={order} />);
+  fireEvent.click(await screen.findByText("Detail"));
+  expect(await screen.findByRole("heading", { name: longNumber })).toBeTruthy();
+  expect(screen.getByText("Transfer bank")).toBeTruthy();
+  expect(screen.getByText("9 September 2026")).toBeTruthy();
+  expect(screen.getByText("Rp 1.234.567.890.123,45")).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Ringkasan Tagihan PO" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Informasi Pembayaran" })).toBeTruthy();
+  expect(screen.getByText(/Referensi bank: ABC-123/).textContent).toBe("Pembayaran termin pertama\nReferensi bank: ABC-123");
+  await waitFor(() => expect(screen.getByRole("button", { name: "Kirim Konfirmasi" }).disabled).toBe(false));
+  fireEvent.click(screen.getByRole("button", { name: "Kembali" }));
+  expect(await screen.findByRole("button", { name: "Detail" })).toBeTruthy();
+});
+
+it("keeps detail summary placeholders while verifying the balance", async () => {
+  render(<PaymentPage purchaseOrder={order} />);
+  await screen.findByText("Dibayar Sebagian");
+  const pending = deferred();
+  PaymentService.getByPurchaseOrderWithSummary.mockReturnValue(pending.promise);
+  fireEvent.click(screen.getByRole("button", { name: "Detail" }));
+  await screen.findByRole("heading", { name: "Informasi Pembayaran" });
+  expect(screen.getByRole("status").textContent).toBe("Memuat ringkasan pembayaran...");
+  for (const label of ["Total PO", "Sudah Dibayar", "Sisa Tagihan"]) {
+    expect(screen.getByText(label).nextElementSibling.textContent).toBe("—");
+  }
+  expect(screen.getByRole("button", { name: "Kirim Konfirmasi" }).disabled).toBe(true);
+  expect(screen.getByText("Tidak ada catatan.")).toBeTruthy();
+  await act(async () => pending.resolve({ payments: [payment], summary }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Kirim Konfirmasi" }).disabled).toBe(false));
+  expect(screen.getByText("Dibayar Sebagian")).toBeTruthy();
+});
 
 it.each(["-1", "0", "1.001", "100000.01", "60000.01"])("rejects %s before creating a payment", async (amount) => {
   render(<PaymentPage purchaseOrder={order} />);
@@ -125,4 +165,46 @@ it("shows a changed server balance error beside the amount without clearing inpu
   await screen.findByText("Sisa tagihan berubah");
   expect(screen.getByLabelText("Nominal").value).toBe("60000");
   expect(screen.getByLabelText("Nominal").getAttribute("aria-invalid")).toBe("true");
+});
+
+it("ignores a late payment response after switching the open PO", async () => {
+  const pending = deferred();
+  PaymentService.getByPurchaseOrderWithSummary.mockImplementation((id) => id === "po1" ? pending.promise : Promise.resolve({
+    payments: [], summary: { ...summary, confirmed_amount: "100000.00", remaining_amount: "0.00" },
+  }));
+  const { rerender } = render(<PaymentPage purchaseOrder={order} readOnly />);
+  await waitFor(() => expect(PaymentService.getByPurchaseOrderWithSummary).toHaveBeenCalled());
+  rerender(<PaymentPage purchaseOrder={{ ...order, purchase_order_id: "po2" }} readOnly />);
+  await screen.findByText("Lunas");
+  await act(async () => pending.resolve({ payments: [payment], summary }));
+  expect(screen.queryByText("PAY-1")).toBeNull();
+  expect(screen.getByText("Lunas")).toBeTruthy();
+});
+
+it("preserves the form and disables save while focus revalidates the balance", async () => {
+  render(<PaymentPage purchaseOrder={order} />);
+  await openForm();
+  fireEvent.change(screen.getByLabelText("Nominal"), { target: { value: "500" } });
+  const pending = deferred();
+  PaymentService.getByPurchaseOrderWithSummary.mockReturnValue(pending.promise);
+  await new Promise((resolve) => setTimeout(resolve, 120));
+  act(() => window.dispatchEvent(new Event("focus")));
+  await waitFor(() => expect(screen.getByText("Simpan Pembayaran").disabled).toBe(true));
+  expect(screen.getByLabelText("Nominal").value).toBe("500");
+  await act(async () => pending.resolve({ payments: [payment], summary }));
+  await waitFor(() => expect(screen.getByText("Simpan Pembayaran").disabled).toBe(false));
+});
+
+it("sends only one creation request for repeated submits", async () => {
+  const pending = deferred();
+  PaymentService.create.mockReturnValue(pending.promise);
+  render(<PaymentPage purchaseOrder={order} />);
+  await openForm();
+  fireEvent.change(screen.getByLabelText("Nominal"), { target: { value: "500" } });
+  const form = screen.getByLabelText("Nominal").closest("form");
+  fireEvent.submit(form);
+  fireEvent.submit(form);
+  expect(PaymentService.create).toHaveBeenCalledTimes(1);
+  await act(async () => pending.resolve(payment));
+  await waitFor(() => expect(screen.queryByText("Simpan Pembayaran")).toBeNull());
 });

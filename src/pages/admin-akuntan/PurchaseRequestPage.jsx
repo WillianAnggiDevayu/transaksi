@@ -1,4 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import usePagination from "../../hooks/usePagination";
+import Pagination from "../../components/Pagination";
+import ItemCombobox from "../../components/ItemCombobox";
+import useCachedList from "../../hooks/useCachedList";
+import CacheFeedback from "../../components/CacheFeedback";
+import { useMemo, useState } from "react";
 
 import {
   Eye,
@@ -17,11 +22,12 @@ import PurchaseOrderService from "../../services/PurchaseOrderService";
 import { PackagingTable, QuantitySummary, ErrorDetails } from "../../components/ProcurementDetails";
 import { localDate, poPayload, canEditQuotation } from "../../utils/procurement";
 
-const empty = {
+const newRow = () => ({
+  clientId: crypto.randomUUID(),
   item_id: "",
   quantity: 1,
   notes: "",
-};
+});
 
 const labels = {
   draft: "Draft",
@@ -34,23 +40,32 @@ const labels = {
 };
 
 function PurchaseRequestPage() {
-  const [requests, setRequests] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
-  const [items, setItems] = useState([]);
-
-  const [selected, setSelected] = useState(null);
-  const [supplierRows, setSupplierRows] = useState([]);
+  const requestResource = useCachedList("purchase-requests", PurchaseRequestService);
+  const supplierResource = useCachedList("suppliers", SupplierService);
+  const itemResource = useCachedList("items", ItemService);
+  const requests = requestResource.data;
+  const suppliers = supplierResource.data;
+  const items = itemResource.data;
+  const [selectedId, setSelectedId] = useState(null);
+  const detailResource = useCachedList(`purchase-requests:${selectedId}`, PurchaseRequestService, "getById", { args: [selectedId], enabled: selectedId != null, resultType: "object" });
+  const suppliersForRequest = useCachedList(`request-suppliers:${selectedId}`, RequestSupplierService, "getByPurchaseRequest", { args: [selectedId], enabled: selectedId != null });
+  const selected = detailResource.data;
+  const supplierRows = suppliersForRequest.data;
+  const detailPagination = usePagination(selected?.purchase_request_detail_purchase_request || selected?.detail_purchase_requests || [], selectedId);
+  const supplierPagination = usePagination(supplierRows, selectedId);
+  const setSelected = (row) => setSelectedId(row?.purchase_request_id ?? row?.id ?? null);
 
   // Untuk modal quotation
   const [selectedQuotation, setSelectedQuotation] =
     useState(null);
 
+  const quoteId = selectedQuotation?.request_supplier_id;
+  const quotationResource = useCachedList(`supplier-request:${quoteId}`, SupplierQuotationService, "getRequestDetail", { args: [quoteId], enabled: quoteId != null, resultType: "object" });
+
   const [create, setCreate] = useState(false);
   const [send, setSend] = useState(false);
 
-  const [rows, setRows] = useState([
-    { ...empty },
-  ]);
+  const [rows, setRows] = useState(() => [newRow()]);
 
   const [supplierIds, setSupplierIds] = useState([]);
 
@@ -71,25 +86,9 @@ function PurchaseRequestPage() {
   });
   const [error, setError] = useState("");
 
-  const [masterAccess, setMasterAccess] = useState({ items: false, suppliers: false });
-  const [masterError, setMasterError] = useState("");
-
-  // LOAD DATA
-  const load = async () => {
-    const [r, s, i] = await Promise.allSettled([PurchaseRequestService.getAll(), SupplierService.getAll(), ItemService.getAll()]);
-    if (r.status === "fulfilled") setRequests(Array.isArray(r.value) ? r.value : []);
-    else setError(r.reason.message || "Gagal mengambil PR.");
-    setSuppliers(s.status === "fulfilled" && Array.isArray(s.value) ? s.value : []);
-    setItems(i.status === "fulfilled" && Array.isArray(i.value) ? i.value : []);
-    setMasterAccess({ items: i.status === "fulfilled", suppliers: s.status === "fulfilled" });
-    setMasterError([s.status === "rejected" ? "Daftar supplier tidak dapat diakses. Pengiriman request dinonaktifkan." : "",
-      i.status === "rejected" ? "Daftar barang tidak dapat diakses. Pembuatan PR dinonaktifkan." : ""].filter(Boolean).join(" "));
-  };
-
-  useEffect(() => {
-    const loadTimer = window.setTimeout(load, 0);
-    return () => window.clearTimeout(loadTimer);
-  }, []);
+  const masterAccess = { items: !itemResource.loading && !itemResource.error, suppliers: !supplierResource.loading && !supplierResource.error };
+  const masterError = [itemResource.error?.message, supplierResource.error?.message].filter(Boolean).join(" ");
+  const load = () => Promise.all([requestResource.refresh(), supplierResource.refresh(), itemResource.refresh()]);
 
   // SEARCH
   const filtered = useMemo(() => {
@@ -103,6 +102,7 @@ function PurchaseRequestPage() {
         .includes(q)
     );
   }, [requests, search]);
+  const pagination = usePagination(filtered, search);
 
   // CARI ITEM
   const getItemById = (itemId) => {
@@ -229,7 +229,7 @@ function PurchaseRequestPage() {
 
     try {
       const result =
-        await SupplierQuotationService.getRequestDetail(requestSupplierId);
+        await SupplierQuotationService.getRequestDetail(requestSupplierId, { force: true });
 
       const quotation =
         result?.request_supplier_supplier_quotation ||
@@ -241,7 +241,7 @@ function PurchaseRequestPage() {
         throw new Error("Data penawaran tidak ditemukan.");
       }
 
-      setSelectedQuotation(quotation);
+      setSelectedQuotation({ ...quotation, request_supplier_id: requestSupplierId });
       setPoForm({
         order_date: localDate(),
         accept_quantity_difference: false,
@@ -267,11 +267,11 @@ function PurchaseRequestPage() {
     setError("");
 
     try {
-      const response = await SupplierQuotationService.getRequestDetail(selectedQuotation.request_supplier_id);
+      const response = await SupplierQuotationService.getRequestDetail(selectedQuotation.request_supplier_id, { force: true });
       const latest = response.request_supplier_supplier_quotation;
       if (!latest || latest.status !== "submitted") throw new Error("Penawaran sudah tidak dapat dipilih. Muat ulang detail penawaran.");
       if (JSON.stringify(latest.quantity_summary) !== JSON.stringify(selectedQuotation.quantity_summary) || String(latest.total) !== String(selectedQuotation.total)) {
-        setSelectedQuotation(latest);
+        setSelectedQuotation({ ...latest, request_supplier_id: selectedQuotation.request_supplier_id });
         setPoForm(previous => ({ ...previous, accept_quantity_difference: false }));
         throw new Error("Penawaran telah berubah. Periksa ulang jumlah dan harga sebelum membuat PO.");
       }
@@ -295,38 +295,12 @@ function PurchaseRequestPage() {
   // BUKA DETAIL PURCHASE REQUEST
   // =========================================================
 
-  const detail = async (r) => {
-    try {
-      const requestId =
-        r.id ||
-        r.purchase_request_id;
-
-      const d =
-        await PurchaseRequestService.getById(
-          requestId
-        );
-
-      setSelected(
-        d?.data || d
-      );
-
-      const s =
-        await RequestSupplierService.getByPurchaseRequest(
-          requestId
-        );
-
-      setSupplierRows(
-        Array.isArray(s) ? s : []
-      );
-
-      setSelectedQuotation(null);
-      setError("");
-    } catch (e) {
-      setError(
-        e?.data?.message ||
-          e?.message ||
-          "Gagal mengambil detail."
-      );
+  const detail = async (row) => {
+    setSelected(row);
+    setSelectedQuotation(null);
+    setError("");
+    if ((row.id || row.purchase_request_id) === selectedId) {
+      await Promise.all([detailResource.refresh(), suppliersForRequest.refresh()]);
     }
   };
 
@@ -344,7 +318,7 @@ function PurchaseRequestPage() {
       if (
         rows.some(
           (x) =>
-            !x.item_id ||
+            !x.item_id || !getItemById(x.item_id) ||
             Number(x.quantity) < 1
         )
       ) {
@@ -371,7 +345,7 @@ function PurchaseRequestPage() {
       setCreate(false);
 
       setRows([
-        { ...empty },
+        newRow(),
       ]);
 
       setNotes("");
@@ -441,7 +415,7 @@ function PurchaseRequestPage() {
 
   if (selected) {
     return (
-      <section className="space-y-5">
+      <section className="space-y-5"><CacheFeedback resources={[requestResource, supplierResource, itemResource, detailResource, suppliersForRequest, quotationResource]} />
 
         {/* HEADER DETAIL */}
         <div className="flex items-center justify-between">
@@ -566,11 +540,7 @@ function PurchaseRequestPage() {
               </thead>
 
               <tbody>
-                {(
-                  selected.purchase_request_detail_purchase_request ||
-                  selected.detail_purchase_requests ||
-                  []
-                ).map((d, i) => {
+                {detailPagination.items.map((d, i) => {
 
                   const item =
                     d.item ||
@@ -593,7 +563,7 @@ function PurchaseRequestPage() {
                     >
 
                       <td className="p-3 text-sm text-slate-500">
-                        {i + 1}
+                        {detailPagination.offset + i + 1}
                       </td>
 
                       <td className="p-3 text-sm font-medium text-slate-800">
@@ -622,6 +592,7 @@ function PurchaseRequestPage() {
 
             </table>
           </div>
+          <Pagination pagination={detailPagination} label="Halaman detail barang PR" />
         </div>
 
         {/* SUPPLIER */}
@@ -658,7 +629,7 @@ function PurchaseRequestPage() {
 
               <tbody>
 
-                {supplierRows.map((r) => {
+                {supplierPagination.items.map((r) => {
 
                   const quotation =
                     r.request_supplier_supplier_quotation ||
@@ -749,6 +720,7 @@ function PurchaseRequestPage() {
 
             </table>
           </div>
+          <Pagination pagination={supplierPagination} label="Halaman supplier PR" />
         </div>
 
         {/* =====================================================
@@ -970,7 +942,7 @@ function PurchaseRequestPage() {
                       Saya sudah memeriksa dan menyetujui kelebihan/kekurangan quantity pada penawaran ini.
                     </label>}
                     <div className="mt-4 flex justify-end">
-                      <button disabled={poLoading || (hasDifference && !poForm.accept_quantity_difference)} className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
+                      <button disabled={poLoading || quotationResource.stale || (hasDifference && !poForm.accept_quantity_difference)} className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
                         {poLoading ? "Membuat PO..." : "Buat Purchase Order"}
                       </button>
                     </div>
@@ -1106,7 +1078,7 @@ function PurchaseRequestPage() {
   // =========================================================
 
   return (
-    <section>
+    <section><CacheFeedback resources={[requestResource, supplierResource, itemResource, detailResource, suppliersForRequest, quotationResource]} />
 
       {/* HEADER */}
       <div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
@@ -1202,7 +1174,7 @@ function PurchaseRequestPage() {
 
             <tbody>
 
-              {filtered.map((r, i) => (
+              {pagination.items.map((r, i) => (
 
                 <tr
                   key={
@@ -1213,7 +1185,7 @@ function PurchaseRequestPage() {
                 >
 
                   <td className="p-4 text-sm text-slate-500">
-                    {i + 1}
+                    {pagination.offset + i + 1}
                   </td>
 
                   <td className="p-4 text-sm font-semibold text-slate-800">
@@ -1272,6 +1244,7 @@ function PurchaseRequestPage() {
           </table>
 
         </div>
+        <Pagination pagination={pagination} />
 
       </div>
 
@@ -1331,61 +1304,20 @@ function PurchaseRequestPage() {
 
                 return (
                   <div
-                    key={i}
-                    className="grid gap-3 rounded-lg border border-slate-300 p-3 md:grid-cols-[1fr_150px_1fr_auto]"
+                    key={r.clientId}
+                    className="grid items-start gap-3 rounded-lg border border-slate-300 p-3 md:grid-cols-[1fr_150px_1fr_auto]"
                   >
 
                     {/* PILIH BARANG */}
-                    <select
-                      required
+                    <ItemCombobox
+                      items={items}
                       value={r.item_id}
-                      onChange={(e) =>
-                        setRows(
-                          (current) =>
-                            current.map(
-                              (row, index) =>
-                                index === i
-                                  ? {
-                                      ...row,
-                                      item_id:
-                                        e.target.value,
-                                    }
-                                  : row
-                            )
-                        )
-                      }
-                      className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500"
-                    >
-
-                      <option value="">
-                        Pilih barang
-                      </option>
-
-                      {items.map(
-                        (item) => {
-
-                          const itemId =
-                            item.item_id ??
-                            item.id;
-
-                          const itemName =
-                            item.item_name ||
-                            item.nama ||
-                            item.nama_barang ||
-                            "-";
-
-                          return (
-                            <option
-                              key={itemId}
-                              value={itemId}
-                            >
-                              {itemName}
-                            </option>
-                          );
-                        }
-                      )}
-
-                    </select>
+                      label={`Barang baris ${i + 1}`}
+                      disabled={loading}
+                      onChange={(itemId) => setRows((current) => current.map((row) =>
+                        row.clientId === r.clientId ? { ...row, item_id: itemId } : row
+                      ))}
+                    />
 
                     {/* JUMLAH + SATUAN */}
                     <div className="flex gap-2">
@@ -1487,7 +1419,7 @@ function PurchaseRequestPage() {
                 setRows(
                   (current) => [
                     ...current,
-                    { ...empty },
+                    newRow(),
                   ]
                 )
               }
@@ -1506,7 +1438,7 @@ function PurchaseRequestPage() {
                   setCreate(false);
 
                   setRows([
-                    { ...empty },
+                    newRow(),
                   ]);
 
                   setNotes("");

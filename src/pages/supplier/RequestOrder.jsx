@@ -1,4 +1,8 @@
-import { useEffect, useState } from "react";
+import usePagination from "../../hooks/usePagination";
+import Pagination from "../../components/Pagination";
+import { useState } from "react";
+import useCachedList from "../../hooks/useCachedList";
+import CacheFeedback from "../../components/CacheFeedback";
 import { CalendarDays, Check, Eye, FileText, PackagePlus, Pencil, Trash2, X } from "lucide-react";
 import SupplierQuotationService from "../../services/SupplierQuotationService";
 import RequestSupplierService from "../../services/RequestSupplierService";
@@ -29,37 +33,28 @@ const formatDate = value => value
   : "-";
 
 export default function RequestOrder() {
-  const [requests, setRequests] = useState([]);
-  const [selected, setSelected] = useState(null);
-  const [units, setUnits] = useState([]);
+  const requestResource = useCachedList("supplier-quotations", SupplierQuotationService);
+  const unitResource = useCachedList("units", UnitService);
+  const requests = requestResource.data;
+  const pagination = usePagination(requests);
+  const units = unitResource.data;
+  const [selectedId, setSelectedId] = useState(null);
+  const detailResource = useCachedList(`supplier-request:${selectedId}`, SupplierQuotationService, "getRequestDetail", { args: [selectedId], enabled: selectedId != null, resultType: "object" });
+  const selected = detailResource.data;
+  const setSelected = (row) => setSelectedId(row?.request_supplier_id ?? null);
   const [editor, setEditor] = useState(null);
   const [header, setHeader] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
-  const load = async () => setRequests(await SupplierQuotationService.getAll());
-
-  useEffect(() => {
-    let active = true;
-    Promise.all([SupplierQuotationService.getAll(), UnitService.getAll()]).then(([rows, unitRows]) => {
-      if (active) { setRequests(rows); setUnits(unitRows); }
-    }).catch(e => { if (active) setError(e); });
-    return () => { active = false; };
-  }, []);
-
-  const open = async row => {
-    setError(null);
-    try { setSelected(await SupplierQuotationService.getRequestDetail(row.request_supplier_id)); }
-    catch (e) { setError(e); }
-  };
-  const refresh = async () => {
-    await load();
-    setSelected(await SupplierQuotationService.getRequestDetail(selected.request_supplier_id));
-  };
+  const open = (row) => { setError(null); setSelected(row); };
+  const refresh = () => Promise.all([requestResource.refresh(), detailResource.refresh()]);
   const pr = selected?.request_supplier_purchase_request;
   const details = pr?.purchase_request_detail_purchase_request || [];
   const quote = selected?.request_supplier_supplier_quotation;
   const lines = quote?.supplier_quotation_detail_supplier_quotation || [];
-  const editable = canEditQuotation(quote);
+  const detailPagination = usePagination(details, selectedId);
+  const linePagination = usePagination(lines, selectedId);
+  const editable = !detailResource.stale && canEditQuotation(quote);
   const act = async callback => {
     setBusy(true); setError(null);
     try { await callback(); await refresh(); } catch (e) { setError(e); } finally { setBusy(false); }
@@ -92,12 +87,13 @@ export default function RequestOrder() {
   };
 
   return <section className="space-y-5">
-    <h1 className="text-2xl font-bold">Penawaran Supplier</h1>
+    <h1 className="text-2xl font-bold">Penawaran Supplier</h1><CacheFeedback resources={[requestResource, unitResource, detailResource]} />
     {!selected && <ErrorDetails error={error} />}
-    <div className="overflow-x-auto rounded-xl border bg-white">
+    <div className="rounded-xl border bg-white">
+      <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
         <thead className="bg-slate-50"><tr>{["Request", "Status", "Quotation", "Aksi"].map(t => <th key={t} className="p-4">{t}</th>)}</tr></thead>
-        <tbody>{requests.map(row => <tr key={row.request_supplier_id} className="border-t">
+        <tbody>{pagination.items.map(row => <tr key={row.request_supplier_id} className="border-t">
           <td className="p-4">{row.request_supplier_purchase_request?.request_number || "-"}</td>
           <td className="p-4">{row.status}</td>
           <td className="p-4">{row.request_supplier_supplier_quotation?.quotation_number || "Belum ada"}</td>
@@ -105,6 +101,8 @@ export default function RequestOrder() {
         </tr>)}</tbody>
       </table>
       {!requests.length && <p className="p-5 text-slate-500">Belum ada permintaan.</p>}
+      </div>
+      <Pagination pagination={pagination} />
     </div>
 
     {selected && <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6">
@@ -134,15 +132,16 @@ export default function RequestOrder() {
 
           <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
             <SectionTitle title="Kebutuhan barang" description="Jumlah barang yang diminta pada purchase request." />
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{details.map(row => <div key={row.detail_purchase_request_id} className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{detailPagination.items.map(row => <div key={row.detail_purchase_request_id} className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
               <p className="text-[13px] font-semibold text-slate-800">{itemName(row)}</p>
               <p className="mt-1 text-xs text-slate-500">Kebutuhan <span className="font-semibold text-slate-700">{row.quantity} {unitName(baseUnit(row))}</span></p>
             </div>)}</div>
+            <Pagination pagination={detailPagination} label="Halaman kebutuhan barang" />
           </section>
 
           {selected.status === "pending" && <ActionNotice title="Respons permintaan" description="Terima request untuk mulai membuat penawaran.">
-            <button disabled={busy} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50" onClick={() => act(() => RequestSupplierService.respond(selected.request_supplier_id, { status: "accepted" }))}><Check size={15} />Terima Request</button>
-            <button disabled={busy} className="rounded-lg border border-red-200 bg-white px-4 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50" onClick={() => act(() => RequestSupplierService.respond(selected.request_supplier_id, { status: "rejected", rejection_reason: "Ditolak oleh supplier." }))}>Tolak Request</button>
+            <button disabled={busy || detailResource.stale} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50" onClick={() => act(() => RequestSupplierService.respond(selected.request_supplier_id, { status: "accepted" }))}><Check size={15} />Terima Request</button>
+            <button disabled={busy || detailResource.stale} className="rounded-lg border border-red-200 bg-white px-4 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50" onClick={() => act(() => RequestSupplierService.respond(selected.request_supplier_id, { status: "rejected", rejection_reason: "Ditolak oleh supplier." }))}>Tolak Request</button>
           </ActionNotice>}
           {selected.status === "accepted" && !quote && <ActionNotice title="Request telah diterima" description="Lengkapi harga dan rincian kemasan untuk membuat quotation.">
             <button className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-700" onClick={() => setEditor({ kind: "create" })}><PackagePlus size={15} />Buat Quotation</button>
@@ -174,13 +173,14 @@ export default function RequestOrder() {
                 <SectionTitle title="Kelola penawaran" description="Ubah rincian kemasan atau informasi umum quotation." />
                 <button className="inline-flex w-fit items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50" onClick={() => setHeader({ valid_until: dateOnly(quote.valid_until), discount_total_percentage: quote.discount_total_percentage || 0, notes: quote.notes || "" })}><Pencil size={14} />Ubah header</button>
               </div>
-              <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">{lines.map(line => <div key={line.detail_supplier_quotation_id} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">{linePagination.items.map(line => <div key={line.detail_supplier_quotation_id} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div><p className="text-[13px] font-semibold text-slate-800">{itemName(line)}</p><p className="mt-0.5 text-xs text-slate-500">{line.quantity} {unitName(line.purchase_unit)} · {formatRupiah(line.subtotal)}</p></div>
                 <div className="flex items-center gap-2">
-                  <button disabled={busy} className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 disabled:opacity-40" onClick={() => setEditor({ kind: "edit", line })}><Pencil size={13} />Ubah</button>
+                  <button disabled={busy || detailResource.stale} className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 disabled:opacity-40" onClick={() => setEditor({ kind: "edit", line })}><Pencil size={13} />Ubah</button>
                   <button disabled={busy || lines.filter(l => l.detail_purchase_request_id === line.detail_purchase_request_id).length <= 1} className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40" onClick={() => remove(line)}><Trash2 size={13} />Hapus</button>
                 </div>
               </div>)}</div>
+              <Pagination pagination={linePagination} label="Halaman kelola penawaran" disabled={busy} />
               <div className="mt-4 flex flex-wrap gap-2">{details.map(row => <button key={row.detail_purchase_request_id} className="inline-flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100" onClick={() => setEditor({ kind: "add", line: newLine(row) })}><PackagePlus size={14} />Tambah kemasan {itemName(row)}</button>)}</div>
             </section>}
             {!editable && <div className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-[13px] text-slate-600">Penawaran terkunci atau telah melewati masa berlaku.</div>}
@@ -189,7 +189,7 @@ export default function RequestOrder() {
               <FormField label="Berlaku sampai"><input className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-[13px] outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10" type="date" min={localDate()} value={header.valid_until} onChange={e => setHeader({ ...header, valid_until: e.target.value })} /></FormField>
               <FormField label="Diskon total (%)"><input className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-[13px] outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10" required type="number" min="0" max="100" step="0.01" value={header.discount_total_percentage} onChange={e => setHeader({ ...header, discount_total_percentage: e.target.value })} /></FormField>
               <label className="text-xs font-medium text-slate-700 sm:col-span-2">Catatan<textarea rows="3" className="mt-1.5 block w-full rounded-lg border border-slate-300 px-3 py-2.5 text-[13px] outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10" value={header.notes} onChange={e => setHeader({ ...header, notes: e.target.value })} /></label>
-              <div className="flex justify-end gap-2 sm:col-span-2"><button type="button" onClick={() => setHeader(null)} className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Batal</button><button disabled={busy} className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50">{busy ? "Menyimpan..." : "Simpan perubahan"}</button></div>
+              <div className="flex justify-end gap-2 sm:col-span-2"><button type="button" onClick={() => setHeader(null)} className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Batal</button><button disabled={busy || detailResource.stale} className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50">{busy ? "Menyimpan..." : "Simpan perubahan"}</button></div>
             </form>}
           </>}
         </div>

@@ -1,3 +1,6 @@
+import usePagination from "../../hooks/usePagination";
+import Pagination from "../../components/Pagination";
+import CacheFeedback from "../../components/CacheFeedback";
 import { useMemo, useState } from "react";
 import { Pencil, Plus, Search, Trash2 } from "lucide-react";
 
@@ -21,10 +24,11 @@ const emptyForm = {
 
 function SupplierPage() {
     // Data Supplier
-    const {
+    const suppliersResource = useCachedList("suppliers", SupplierService);
+  const {
         data: suppliersData,
         loading: suppliersLoading,
-    } = useCachedList("suppliers", SupplierService);
+    } = suppliersResource;
 
     const suppliers = useMemo(
         () => (Array.isArray(suppliersData) ? suppliersData : []),
@@ -32,10 +36,11 @@ function SupplierPage() {
     );
 
     // Data User
-    const {
+    const usersResource = useCachedList("users", UserService);
+  const {
         data: usersData,
         loading: usersLoading,
-    } = useCachedList("users", UserService);
+    } = usersResource;
 
     const users = Array.isArray(usersData)
         ? usersData
@@ -63,6 +68,7 @@ function SupplierPage() {
                 .includes(keyword)
         );
     }, [suppliers, search]);
+    const pagination = usePagination(filtered, search);
 
     // Buka Tambah Supplier
     const openCreate = () => {
@@ -267,7 +273,7 @@ function SupplierPage() {
             if (!userId) {
                 try {
                     const latestUsers =
-                        await UserService.getAll();
+                        await usersResource.refresh();
 
                     const createdUser =
                         Array.isArray(latestUsers)
@@ -353,7 +359,7 @@ function SupplierPage() {
 
     // Render
     return (
-        <section>
+        <section><CacheFeedback resources={[suppliersResource, usersResource]} />
             {/* Header */}
             <div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
                 <div>
@@ -435,7 +441,7 @@ function SupplierPage() {
                                     </td>
                                 </tr>
                             ) : (
-                                filtered.map(
+                                pagination.items.map(
                                     (supplier, index) => (
                                         <tr
                                             key={
@@ -443,7 +449,7 @@ function SupplierPage() {
                                             }
                                             className="border-t border-slate-100">
                                             <td className="px-5 py-4 text-sm text-slate-500">
-                                                {index + 1}
+                                                {pagination.offset + index + 1}
                                             </td>
 
                                             <td className="px-5 py-4 text-sm font-medium text-slate-800">
@@ -498,6 +504,7 @@ function SupplierPage() {
                         </tbody>
                     </table>
                 </div>
+                <Pagination pagination={pagination} />
             </div>
 
             {/* Modal Tambah / Edit Supplier */}

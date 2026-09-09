@@ -1,109 +1,79 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import CacheStore from "../services/CacheStore";
 
-export default function useCachedList(
-    cacheKey,
-    service,
-    methodName = "getAll"
-) {
-    const [data, setData] = useState(() => {
-        const cached = CacheStore.get(cacheKey);
-        return Array.isArray(cached) ? cached : [];
-    });
+const EMPTY_LIST = Object.freeze([]);
+const EMPTY_OPTIONS = Object.freeze({});
+const ignoreAutomaticError = () => {};
 
-    const [loading, setLoading] = useState(
-        () => !CacheStore.has(cacheKey)
-    );
+// args must be JSON-serializable IDs/parameters; include them in cacheKey as well.
+export default function useCachedList(cacheKey, service, methodName = "getAll", options = EMPTY_OPTIONS) {
+    const { enabled = true, resultType = "array" } = options;
+    const argsKey = JSON.stringify(options.args || []);
+    const args = useMemo(() => JSON.parse(argsKey), [argsKey]);
+    const identity = cacheKey + ":" + argsKey;
+    const [checked, setChecked] = useState(null);
+    const empty = resultType === "object" ? null : EMPTY_LIST;
+    const subscribe = useCallback((callback) => enabled
+        ? CacheStore.subscribe(cacheKey, callback) : () => {}, [cacheKey, enabled]);
+    const getSnapshot = useCallback(() => CacheStore.snapshot(cacheKey), [cacheKey]);
+    const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
-    const fetchData = useCallback(async () => {
-        setLoading(true);
-
-        try {
-            const result = await service[methodName]();
-
-            // Pastikan data yang masuk ke cache selalu array.
-            const normalizedData = Array.isArray(result)
-                ? result
-                : [];
-
-            CacheStore.set(cacheKey, normalizedData);
-
-            return normalizedData;
-        } catch (error) {
-            console.error(
-                `Gagal memuat data untuk cache "${cacheKey}":`,
-                error
-            );
-
-            setData([]);
-            setLoading(false);
-
-            return [];
-        }
-    }, [cacheKey, service, methodName]);
+    const refresh = useCallback(({ dedupe = false } = {}) => {
+        if (!enabled) return Promise.resolve(empty);
+        return CacheStore.fetch(cacheKey, async () => {
+            const result = await service[methodName](...args, { force: true, cache: false });
+            const valid = resultType === "array" ? Array.isArray(result)
+                : result !== null && typeof result === "object" && !Array.isArray(result);
+            if (!valid) throw new Error("Format data tidak sesuai untuk " + cacheKey + ".");
+            return result;
+        }, { force: true, dedupe }).then((data) => { setChecked(identity); return data; }, (error) => { setChecked(identity); throw error; });
+    }, [cacheKey, service, methodName, args, enabled, empty, resultType, identity]);
 
     useEffect(() => {
-        let mounted = true;
-
-        const handleCacheUpdate = (value) => {
-            if (!mounted) return;
-
-            /*
-             * undefined berarti cache di-clear/invalidate.
-             * Ambil ulang data dari API.
-             */
-            if (value === undefined) {
-                fetchData();
-                return;
-            }
-
-            /*
-             * Cache harus selalu berupa array.
-             */
-            const normalizedData = Array.isArray(value)
-                ? value
-                : [];
-
-            setData(normalizedData);
-            setLoading(false);
+        if (!enabled) return;
+        let timer;
+        let active = true;
+        const session = CacheStore.session();
+        const schedule = (force = true) => {
+            window.clearTimeout(timer);
+            timer = window.setTimeout(() => {
+                if (!active || CacheStore.session() !== session) return;
+                if (!force && !CacheStore.snapshot(cacheKey).stale) { setChecked(identity); return; }
+                refresh({ dedupe: true }).catch(ignoreAutomaticError);
+            }, 0);
         };
-
-        const unsubscribe = CacheStore.subscribe(
-            cacheKey,
-            handleCacheUpdate
-        );
-
-        /*
-         * Inisialisasi state dijadwalkan setelah effect selesai. Ini juga
-         * menangani perubahan cacheKey tanpa melakukan setState sinkron di
-         * dalam effect.
-         */
-        const initializeTimer = window.setTimeout(() => {
-            if (!mounted) return;
-
-            if (CacheStore.has(cacheKey)) {
-                const cached = CacheStore.get(cacheKey);
-
-                if (Array.isArray(cached)) {
-                    handleCacheUpdate(cached);
-                } else {
-                    CacheStore.clear(cacheKey);
-                }
-            } else {
-                fetchData();
-            }
-        }, 0);
-
+        const unsubscribe = CacheStore.subscribe(cacheKey, (_, event) => {
+            if (event === "invalidate") schedule(false);
+            if (event === "reset") window.clearTimeout(timer);
+        });
+        const visible = () => {
+            if (document.visibilityState !== "hidden") schedule();
+        };
+        window.addEventListener("focus", visible);
+        document.addEventListener("visibilitychange", visible);
+        window.addEventListener("online", visible);
+        schedule();
         return () => {
-            mounted = false;
-            window.clearTimeout(initializeTimer);
+            active = false;
+            window.clearTimeout(timer);
             unsubscribe();
+            window.removeEventListener("focus", visible);
+            document.removeEventListener("visibilitychange", visible);
+            window.removeEventListener("online", visible);
         };
-    }, [cacheKey, fetchData]);
+    }, [cacheKey, enabled, refresh, identity]);
+
+    const setData = useCallback((value) => {
+        if (!enabled) return;
+        CacheStore.set(cacheKey, typeof value === "function" ? value(CacheStore.get(cacheKey) ?? empty) : value);
+    }, [cacheKey, enabled, empty]);
 
     return {
-        data,
-        loading,
-        setData,
+        data: enabled ? snapshot.data ?? empty : empty,
+        loading: enabled && snapshot.data === undefined && !snapshot.error,
+        refreshing: enabled && snapshot.loading,
+        stale: enabled && (snapshot.stale || checked !== identity),
+        error: enabled ? snapshot.error : null,
+        refresh, setData,
     };
 }

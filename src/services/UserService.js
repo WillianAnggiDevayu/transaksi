@@ -1,5 +1,5 @@
 import ApiClient from "./ApiClient";
-import CacheStore from "./CacheStore";
+import { readList, readDetail } from "./CachedResource";
 
 const CACHE_KEY = "users";
 
@@ -11,37 +11,19 @@ class UserService {
     };
   }
 
-  async getAll() {
-    if (CacheStore.has(CACHE_KEY)) {
-      return CacheStore.get(CACHE_KEY);
+    async getAll(options = {}) {
+        return readList(CACHE_KEY, "/users", options, (row) => this.normalize(row));
     }
 
-    const response = await ApiClient.get("/users");
-    const data = response?.data || response;
-
-    const result = Array.isArray(data)
-      ? data.map((user) => this.normalize(user))
-      : [];
-
-    CacheStore.set(CACHE_KEY, result);
-
-    return result;
-  }
-
-  async getById(id) {
-    const response = await ApiClient.get(`/users/${id}`);
-    const data = response?.data || response;
-
-    return this.normalize(data);
-  }
+    async getById(id, options = {}) {
+        return readDetail(`users:${id}`, `/users/${id}`, options, (row) => this.normalize(row));
+    }
 
   async create(payload) {
     const result = await ApiClient.post(
       "/users",
       payload
     );
-
-    CacheStore.clear(CACHE_KEY);
 
     return result;
   }
@@ -52,8 +34,6 @@ class UserService {
       payload
     );
 
-    CacheStore.clear(CACHE_KEY);
-
     return result;
   }
 
@@ -61,8 +41,6 @@ class UserService {
     const result = await ApiClient.delete(
       `/users/${id}`
     );
-
-    CacheStore.clear(CACHE_KEY);
 
     return result;
   }

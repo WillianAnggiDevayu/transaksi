@@ -1,3 +1,6 @@
+import usePagination from "../../hooks/usePagination";
+import Pagination from "../../components/Pagination";
+import CacheFeedback from "../../components/CacheFeedback";
 import { useMemo, useState } from "react";
 import { Pencil, Plus, Search, Trash2 } from "lucide-react";
 import UnitService from "../../services/UnitService";
@@ -10,10 +13,11 @@ const emptyForm = {
 };
 
 function UnitPage() {
+  const unitsResource = useCachedList("units", UnitService);
   const {
     data: units,
     loading,
-  } = useCachedList("units", UnitService);
+  } = unitsResource;
 
   const [search, setSearch] = useState("");
   const [form, setForm] = useState(emptyForm);
@@ -31,6 +35,7 @@ function UnitPage() {
         .includes(keyword)
     );
   }, [units, search]);
+  const pagination = usePagination(filtered, search);
 
   const openCreate = () => {
     setEditing(null);
@@ -110,7 +115,7 @@ function UnitPage() {
   };
 
   return (
-    <section>
+    <section><CacheFeedback resources={[unitsResource]} />
       <div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <p className="text-sm font-medium text-blue-600">
@@ -198,13 +203,13 @@ function UnitPage() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((unit, index) => (
+                pagination.items.map((unit, index) => (
                   <tr
                     key={unit.unit_id}
                     className="border-t border-slate-100"
                   >
                     <td className="px-5 py-4 text-sm text-slate-500">
-                      {index + 1}
+                      {pagination.offset + index + 1}
                     </td>
 
                     <td className="px-5 py-4 text-sm font-medium text-slate-800">
@@ -242,6 +247,7 @@ function UnitPage() {
             </tbody>
           </table>
         </div>
+        <Pagination pagination={pagination} />
       </div>
 
       {open && (

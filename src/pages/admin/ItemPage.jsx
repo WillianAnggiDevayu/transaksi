@@ -1,3 +1,6 @@
+import usePagination from "../../hooks/usePagination";
+import Pagination from "../../components/Pagination";
+import CacheFeedback from "../../components/CacheFeedback";
 import { useMemo, useState } from "react";
 import { Pencil, Plus, Search, Trash2 } from "lucide-react";
 import ItemService from "../../services/ItemService";
@@ -6,15 +9,17 @@ import useCachedList from "../../hooks/useCachedList";
 import { confirmAction } from "../../services/ConfirmationService";
 
 function ItemPage() {
+  const itemsResource = useCachedList("items", ItemService);
   const {
     data: itemsData,
     loading: itemsLoading,
-  } = useCachedList("items", ItemService);
+  } = itemsResource;
 
+  const unitsResource = useCachedList("units", UnitService);
   const {
     data: unitsData,
     loading: unitsLoading,
-  } = useCachedList("units", UnitService);
+  } = unitsResource;
 
   const items = useMemo(
     () => (Array.isArray(itemsData) ? itemsData : []),
@@ -88,6 +93,7 @@ function ItemPage() {
         .includes(keyword)
     );
   }, [displayItems, search]);
+  const pagination = usePagination(filteredItems, search);
 
   const openCreate = () => {
     setEditingItem(null);
@@ -184,7 +190,7 @@ function ItemPage() {
   };
 
   return (
-    <section>
+    <section><CacheFeedback resources={[itemsResource, unitsResource]} />
       <div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <p className="text-sm font-medium text-blue-600">
@@ -287,13 +293,13 @@ function ItemPage() {
                   </td>
                 </tr>
               ) : (
-                filteredItems.map((item, index) => (
+                pagination.items.map((item, index) => (
                   <tr
                     key={item.item_id}
                     className="border-t border-slate-100"
                   >
                     <td className="px-5 py-4 text-sm text-slate-500">
-                      {index + 1}
+                      {pagination.offset + index + 1}
                     </td>
 
                     <td className="px-5 py-4 text-sm font-medium text-slate-800">
@@ -343,6 +349,7 @@ function ItemPage() {
             </tbody>
           </table>
         </div>
+        <Pagination pagination={pagination} />
       </div>
 
       {showModal && (

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 vi.mock("../src/services/PurchaseOrderService", () => ({ default: { getAll: vi.fn(), getById: vi.fn() } }));
-vi.mock("../src/services/PaymentService", () => ({ default: { getByPurchaseOrder: vi.fn(), getByPurchaseOrderWithSummary: vi.fn(), delete: vi.fn(), confirm: vi.fn(), create: vi.fn(), getById: vi.fn(), submit: vi.fn() } }));
+vi.mock("../src/services/PaymentService", async (importOriginal) => ({ default: { getOverview: (await importOriginal()).default.getOverview, getByPurchaseOrder: vi.fn(), getByPurchaseOrderWithSummary: vi.fn(), delete: vi.fn(), confirm: vi.fn(), create: vi.fn(), getById: vi.fn(), submit: vi.fn() } }));
 import PurchaseOrderService from "../src/services/PurchaseOrderService";
 import PaymentService from "../src/services/PaymentService";
 import PurchaseOrderPage from "../src/pages/admin-akuntan/PurchaseOrderPage";

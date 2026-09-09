@@ -90,7 +90,7 @@ class ApiClient {
     const isAuthenticationRequest = ["/login", "/logout"].includes(path);
 
     if (!isAuthenticationRequest) {
-      if (!["GET", "HEAD"].includes(method)) CacheStore.clearAll();
+      if (!["GET", "HEAD"].includes(method)) CacheStore.invalidateAll();
       notifyMutationSuccess(method, data);
     }
 
@@ -115,6 +115,8 @@ class ApiClient {
       targetId: this.extractTargetId(path),
       tempId,
     });
+
+    CacheStore.invalidateAll();
 
     return {
       __offlineQueued: true,
@@ -238,6 +240,7 @@ class ApiClient {
       }
     }
 
+    if (synced || failed) CacheStore.invalidateAll();
     window.dispatchEvent(
       new CustomEvent("pms-sync-complete", { detail: { synced, failed } })
     );

@@ -1,3 +1,6 @@
+import usePagination from "../../hooks/usePagination";
+import Pagination from "../../components/Pagination";
+import CacheFeedback from "../../components/CacheFeedback";
 import { useMemo, useState } from "react";
 import { Pencil, Plus, Search, Trash2 } from "lucide-react";
 import useCachedList from "../../hooks/useCachedList";
@@ -18,7 +21,8 @@ const ROLE_OPTIONS = [
 ];
 
 function UserPage({ currentUser }) {
-  const { data: usersData, loading } = useCachedList("users", UserService);
+  const usersResource = useCachedList("users", UserService);
+  const { data: usersData, loading } = usersResource;
   const users = useMemo(
     () => (Array.isArray(usersData) ? usersData : []).filter((user) =>
       ROLE_OPTIONS.some((role) => role.value === user.role)
@@ -42,6 +46,7 @@ function UserPage({ currentUser }) {
         .includes(keyword)
     );
   }, [users, search]);
+  const pagination = usePagination(filtered, search);
 
   const isSelf = (user) => user.id === currentUser?.id;
 
@@ -134,7 +139,7 @@ function UserPage({ currentUser }) {
   };
 
   return (
-    <section>
+    <section><CacheFeedback resources={[usersResource]} />
       {/* HEADER */}
       <div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
@@ -204,9 +209,9 @@ function UserPage({ currentUser }) {
                   </td>
                 </tr>
               ) : (
-                filtered.map((user, index) => (
+                pagination.items.map((user, index) => (
                   <tr key={user.id} className="border-t border-slate-100">
-                    <td className="px-5 py-4 text-sm text-slate-500">{index + 1}</td>
+                    <td className="px-5 py-4 text-sm text-slate-500">{pagination.offset + index + 1}</td>
 
                     <td className="px-5 py-4 text-sm font-medium text-slate-800">
                       {user.name}
@@ -253,6 +258,7 @@ function UserPage({ currentUser }) {
             </tbody>
           </table>
         </div>
+        <Pagination pagination={pagination} />
       </div>
 
       {/* MODAL TAMBAH / EDIT */}

@@ -1,32 +1,15 @@
 import ApiClient from "./ApiClient";
-import CacheStore from "./CacheStore";
+import { readList, readDetail } from "./CachedResource";
 
 const CACHE_KEY = "supplier-quotations";
 
 class SupplierQuotationService {
-    async getAll() {
-        if (CacheStore.has(CACHE_KEY)) {
-            return CacheStore.get(CACHE_KEY);
-        }
-
-        const response = await ApiClient.get(
-            "/supplier-quotations"
-        );
-
-        const result = response?.data || response;
-        const data = Array.isArray(result) ? result : [];
-
-        CacheStore.set(CACHE_KEY, data);
-
-        return data;
+    async getAll(options = {}) {
+        return readList(CACHE_KEY, "/supplier-quotations", options);
     }
 
-    async getRequestDetail(requestSupplierId) {
-        const response = await ApiClient.get(
-            `/supplier-quotations/request-suppliers/${requestSupplierId}`
-        );
-
-        return response?.data || response;
+    async getRequestDetail(id, options = {}) {
+        return readDetail(`supplier-request:${id}`, `/supplier-quotations/request-suppliers/${id}`, options);
     }
 
     async create(requestSupplierId, payload) {
@@ -34,8 +17,6 @@ class SupplierQuotationService {
             `/supplier-quotations/request-suppliers/${requestSupplierId}`,
             payload
         );
-
-        CacheStore.clear(CACHE_KEY);
 
         return result;
     }
@@ -54,8 +35,6 @@ class SupplierQuotationService {
             payload
         );
 
-        CacheStore.clear(CACHE_KEY);
-
         return result;
     }
 
@@ -68,8 +47,6 @@ class SupplierQuotationService {
             `/supplier-quotations/${quotationId}/details/${detailId}`,
             payload
         );
-
-        CacheStore.clear(CACHE_KEY);
 
         return result;
     }

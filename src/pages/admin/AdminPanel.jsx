@@ -41,7 +41,7 @@ function AdminPanel({ user, onLogout }) {
 
   const pages = {
     // Admin
-    dashboard: <DashboardAdmin onNavigate={navigate} />,
+    dashboard: <DashboardAdmin onNavigate={navigate} user={user} />,
     items: <ItemPage />,
     units: <UnitPage />,
     suppliers: <SupplierPage />,

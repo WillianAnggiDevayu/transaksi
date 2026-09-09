@@ -4,36 +4,25 @@ import { isOwner } from "../utils/procurement";
 
 const visible = rows => { const user = AuthService.getUser(); return user?.role === "supplier" ? rows.filter(po => isOwner(po, user)) : rows; };
 import CacheStore from "./CacheStore";
+import { readList, readDetail } from "./CachedResource";
 
 const CACHE_KEY = "purchase-orders";
 
 class PurchaseOrderService {
-    async getAll() {
-        if (CacheStore.has(CACHE_KEY)) {
-            return visible(CacheStore.get(CACHE_KEY));
-        }
-
-        const response = await ApiClient.get(
-            "/purchase-orders"
-        );
-
-        const result = response?.data || response;
-        const data = Array.isArray(result) ? result : [];
-
-        CacheStore.set(CACHE_KEY, data);
-
-        return visible(data);
+    async getAll(options = {}) {
+        return CacheStore.read(CACHE_KEY, async () => visible(await readList(CACHE_KEY, "/purchase-orders", { cache: false })), options);
     }
 
-    async getById(id) {
-        const response = await ApiClient.get(
-            `/purchase-orders/${id}`
-        );
-
-        const po = response?.data || response;
-        const user = AuthService.getUser();
-        if (user?.role === "supplier" && !isOwner(po, user)) throw new Error("PO ini bukan milik akun supplier Anda.");
-        return po;
+    async getById(id, options = {}) {
+        return readDetail(`purchase-orders:${id}`, `/purchase-orders/${id}`, options, (po) => {
+            const user = AuthService.getUser();
+            if (user?.role === "supplier" && !isOwner(po, user)) {
+                const error = new Error("PO ini bukan milik akun supplier Anda.");
+                error.status = 403;
+                throw error;
+            }
+            return po;
+        });
     }
 
     async createFromQuotation(
@@ -45,8 +34,6 @@ class PurchaseOrderService {
             payload
         );
 
-        CacheStore.clear(CACHE_KEY);
-
         return result;
     }
 
@@ -55,8 +42,6 @@ class PurchaseOrderService {
             `/purchase-orders/${id}`,
             payload
         );
-
-        CacheStore.clear(CACHE_KEY);
 
         return result;
     }
@@ -70,8 +55,6 @@ class PurchaseOrderService {
             `/purchase-orders/${id}/status`,
             { ...dates, status }
         );
-
-        CacheStore.clear(CACHE_KEY);
 
         return result;
     }

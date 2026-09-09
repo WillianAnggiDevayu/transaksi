@@ -1,12 +1,9 @@
 import ApiClient from "./ApiClient";
+import { readList } from "./CachedResource";
 
 class RequestSupplierService {
-    async getByPurchaseRequest(purchaseRequestId) {
-        const response = await ApiClient.get(
-            `/purchase-requests/${purchaseRequestId}/request-suppliers`
-        );
-
-        return response?.data || response;
+    async getByPurchaseRequest(id, options = {}) {
+        return readList(`request-suppliers:${id}`, `/purchase-requests/${id}/request-suppliers`, options);
     }
 
     async createMultiple(purchaseRequestId, payload) {

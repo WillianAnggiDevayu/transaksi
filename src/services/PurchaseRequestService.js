@@ -1,6 +1,5 @@
 import ApiClient from "./ApiClient";
-import OfflineQueue from "./OfflineQueue";
-import CacheStore from "./CacheStore";
+import { readList, readDetail } from "./CachedResource";
 
 const CACHE_KEY = "purchase-requests";
 
@@ -18,50 +17,12 @@ class PurchaseRequestService {
         };
     }
 
-    async getAll() {
-        if (CacheStore.has(CACHE_KEY)) {
-            return CacheStore.get(CACHE_KEY);
-        }
-
-        let rawItems = [];
-
-        try {
-            const response = await ApiClient.get(
-                "/purchase-requests"
-            );
-
-            const data = response?.data || response;
-
-            rawItems = Array.isArray(data) ? data : [];
-        } catch (err) {
-            if (err?.status) throw err;
-            console.warn("Gagal memuat purchase request:", err.message);
-        }
-
-        const items = rawItems.map((item) =>
-            this.normalize(item)
-        );
-
-        const result = await OfflineQueue.mergeOptimistic(
-            "purchase-requests",
-            "purchase_request_id",
-            items,
-            (raw) => this.normalize(raw)
-        );
-
-        CacheStore.set(CACHE_KEY, result);
-
-        return result;
+    async getAll(options = {}) {
+        return readList(CACHE_KEY, "/purchase-requests", options, (row) => this.normalize(row), "purchase_request_id");
     }
 
-    async getById(id) {
-        const response = await ApiClient.get(
-            `/purchase-requests/${id}`
-        );
-
-        const data = response?.data || response;
-
-        return this.normalize(data);
+    async getById(id, options = {}) {
+        return readDetail(`purchase-requests:${id}`, `/purchase-requests/${id}`, options, (row) => this.normalize(row));
     }
 
     async create(payload) {
@@ -69,8 +30,6 @@ class PurchaseRequestService {
             "/purchase-requests",
             payload
         );
-
-        CacheStore.clear(CACHE_KEY);
 
         return result;
     }
@@ -81,8 +40,6 @@ class PurchaseRequestService {
             payload
         );
 
-        CacheStore.clear(CACHE_KEY);
-
         return result;
     }
 
@@ -92,8 +49,6 @@ class PurchaseRequestService {
             payload
         );
 
-        CacheStore.clear(CACHE_KEY);
-
         return result;
     }
 
@@ -101,8 +56,6 @@ class PurchaseRequestService {
         const result = await ApiClient.delete(
             `/purchase-requests/${id}/details/${detailId}`
         );
-
-        CacheStore.clear(CACHE_KEY);
 
         return result;
     }
